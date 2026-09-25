@@ -2,7 +2,7 @@
 
 import { PageError } from "@/src/components/layout/page-error";
 
-export default function LearningError({
+export default function LessonError({
   error,
   reset,
 }: {
@@ -11,10 +11,11 @@ export default function LearningError({
 }) {
   return (
     <PageError
-      scope="learning.course"
+      scope="learning.lesson"
       error={error}
-      title="We could not load this course"
-      description="Your learning data is unchanged. Try again or return to your dashboard."
+      eyebrow="Lesson"
+      title="We could not load this lesson"
+      description="Your lesson progress is unchanged. Try again, or return to your dashboard and reopen the lesson."
       reset={reset}
       backHref="/dashboard"
       backLabel="Dashboard"
