@@ -11,6 +11,7 @@ out/
 !.env.example
 
 # Local tooling
+tsconfig.tsbuildinfo
 .coverage/
 coverage/
 playwright-report/
