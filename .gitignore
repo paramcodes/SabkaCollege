@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local tooling
+.coverage/
+coverage/
+playwright-report/
+test-results/
+.playwright/
+
+# Visual brainstorming artifacts
+.superpowers/
+
+# OS files
+.DS_Store
+*.log
