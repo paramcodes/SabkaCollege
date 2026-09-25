@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
 
 import { hasCourseAccess } from "@/src/lib/billing/entitlements";
 import { courseSlugSchema } from "@/src/lib/validation/catalog-routes";
@@ -208,6 +208,27 @@ export async function getCourseProgressSummary(
   courseSlug: string,
   userId: string,
 ): Promise<number> {
-  const view = await getCourseLearningView(courseSlug, userId);
-  return view?.progressPercent ?? 0;
+  const parsedCourseSlug = courseSlugSchema.parse(courseSlug);
+  const parsedUserId = userIdSchema.parse(userId);
+  const [summary] = await db
+    .select({
+      totalLessons: count(lessons.id),
+      completedLessons: sql<number>`count(*) filter (where ${lessonProgress.completedAt} is not null)`,
+    })
+    .from(lessons)
+    .innerJoin(modules, eq(lessons.moduleId, modules.id))
+    .innerJoin(courses, eq(modules.courseId, courses.id))
+    .leftJoin(
+      lessonProgress,
+      and(
+        eq(lessonProgress.userId, parsedUserId),
+        eq(lessonProgress.lessonId, lessons.id),
+      ),
+    )
+    .where(and(eq(courses.status, "published"), eq(courses.slug, parsedCourseSlug)));
+
+  return calculateCourseProgress(
+    Number(summary?.totalLessons ?? 0),
+    Number(summary?.completedLessons ?? 0),
+  );
 }

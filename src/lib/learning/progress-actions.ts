@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { deriveProgressFromPosition } from "@/src/lib/video/player-events";
 import { shouldAutoComplete } from "@/src/lib/utils/progress";
 
 const courseSlugSchema = z
@@ -13,7 +14,9 @@ const saveSchema = z.object({
   courseSlug: courseSlugSchema,
   lessonSlug: lessonSlugSchema,
   lastPositionSeconds: z.number().finite().nonnegative(),
-  maxWatchedPercentage: z.number().finite().min(0).max(1),
+  // Accepted for compatibility with older clients, but never read. The server
+  // derives this value from the canonical duration and last position.
+  maxWatchedPercentage: z.number().finite().min(0).max(1).optional(),
 });
 
 const completeSchema = z.object({
@@ -104,13 +107,17 @@ export function createProgressActions(dependencies: ProgressDependencies) {
       return error("DATABASE_ERROR", "Progress could not be saved. Please try again.");
     }
 
-    const duration = Math.max(0, lesson.durationSeconds);
-    const lastPositionSeconds = Math.min(duration, Math.max(0, identity.lastPositionSeconds));
-    const maxWatchedPercentage = Math.min(1, Math.max(0, identity.maxWatchedPercentage));
+    const derivedProgress = deriveProgressFromPosition({
+      positionSeconds: identity.lastPositionSeconds,
+      canonicalDurationSeconds: lesson.durationSeconds,
+    });
 
     try {
       const existing = await dependencies.getProgress(user.id, lesson.lessonId);
-      const nextMax = Math.max(existing?.maxWatchedPercentage ?? 0, maxWatchedPercentage);
+      const nextMax = Math.max(
+        existing?.maxWatchedPercentage ?? 0,
+        derivedProgress.maxWatchedPercentage,
+      );
       const autoComplete = shouldAutoComplete(nextMax);
       const completedAt = existing?.completedAt ?? (autoComplete ? new Date() : null);
       const completionMethod =
@@ -119,7 +126,7 @@ export function createProgressActions(dependencies: ProgressDependencies) {
       await dependencies.upsertProgress({
         userId: user.id,
         lessonId: lesson.lessonId,
-        lastPositionSeconds,
+        lastPositionSeconds: derivedProgress.lastPositionSeconds,
         maxWatchedPercentage: nextMax,
         completedAt,
         completionMethod,

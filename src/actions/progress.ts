@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/src/db";
 import { getCourseProgressSummary } from "@/src/db/queries/learning";
@@ -65,10 +65,14 @@ async function upsertProgress(input: {
     .onConflictDoUpdate({
       target: [lessonProgress.userId, lessonProgress.lessonId],
       set: {
-        lastPositionSeconds: input.lastPositionSeconds,
-        maxWatchedPercentage: input.maxWatchedPercentage,
-        completedAt: input.completedAt,
-        completionMethod: input.completionMethod,
+        // A delayed request may arrive after a newer request. GREATEST makes
+        // both watched values monotonic at the database concurrency boundary.
+        lastPositionSeconds: sql`GREATEST(${lessonProgress.lastPositionSeconds}, ${input.lastPositionSeconds})`,
+        maxWatchedPercentage: sql`GREATEST(${lessonProgress.maxWatchedPercentage}, ${input.maxWatchedPercentage})`,
+        // Completion fields are one-way transitions. COALESCE preserves the
+        // original timestamp and method even when an older save lands later.
+        completedAt: sql`COALESCE(${lessonProgress.completedAt}, ${input.completedAt})`,
+        completionMethod: sql`COALESCE(${lessonProgress.completionMethod}, ${input.completionMethod})`,
         updatedAt: new Date(),
       },
     });

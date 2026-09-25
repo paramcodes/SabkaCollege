@@ -56,28 +56,80 @@ describe("progress actions", () => {
     expect(dependencies.upsertProgress).not.toHaveBeenCalled();
   });
 
-  it("sets automatic completion only at ninety percent", async () => {
+  it("derives watched percentage from the canonical duration and ignores a claimed percentage", async () => {
+    const { dependencies, actions } = makeDependencies();
+    const result = await actions.saveLessonProgress({
+      courseSlug: "course-one",
+      lessonSlug: "lesson-one",
+      lastPositionSeconds: 0,
+      maxWatchedPercentage: 0.9,
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      data: { completed: false, courseProgress: 50 },
+    });
+    expect(dependencies.upsertProgress).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lastPositionSeconds: 0,
+        maxWatchedPercentage: 0,
+        completedAt: null,
+        completionMethod: null,
+      }),
+    );
+  });
+
+  it("sets automatic completion only when canonical playback reaches ninety percent", async () => {
     const { dependencies, actions } = makeDependencies();
     await actions.saveLessonProgress({
       courseSlug: "course-one",
       lessonSlug: "lesson-one",
       lastPositionSeconds: 89,
-      maxWatchedPercentage: 0.89,
+      maxWatchedPercentage: 1,
     });
     await actions.saveLessonProgress({
       courseSlug: "course-one",
       lessonSlug: "lesson-one",
       lastPositionSeconds: 90,
-      maxWatchedPercentage: 0.9,
+      maxWatchedPercentage: 0,
     });
 
     expect(dependencies.upsertProgress).toHaveBeenNthCalledWith(
       1,
-      expect.objectContaining({ completionMethod: null, completedAt: null }),
+      expect.objectContaining({
+        maxWatchedPercentage: 0.89,
+        completionMethod: null,
+        completedAt: null,
+      }),
     );
     expect(dependencies.upsertProgress).toHaveBeenNthCalledWith(
       2,
-      expect.objectContaining({ completionMethod: "automatic" }),
+      expect.objectContaining({
+        maxWatchedPercentage: 0.9,
+        completionMethod: "automatic",
+      }),
+    );
+  });
+
+  it("never auto-completes a lesson with a zero canonical duration", async () => {
+    const { dependencies, actions } = makeDependencies({
+      findLesson: vi.fn(async () => ({ ...lesson, durationSeconds: 0 })),
+    });
+    const result = await actions.saveLessonProgress({
+      courseSlug: "course-one",
+      lessonSlug: "lesson-one",
+      lastPositionSeconds: 120,
+      maxWatchedPercentage: 1,
+    });
+
+    expect(result).toMatchObject({ ok: true, data: { completed: false } });
+    expect(dependencies.upsertProgress).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lastPositionSeconds: 0,
+        maxWatchedPercentage: 0,
+        completedAt: null,
+        completionMethod: null,
+      }),
     );
   });
 

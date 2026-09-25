@@ -1,6 +1,6 @@
 export type VideoProviderEvent =
   | {
-      type: "timeupdate" | "pause" | "ended";
+      type: "timeupdate" | "play" | "pause" | "ended";
       positionSeconds: number;
       durationSeconds: number;
     }
@@ -36,4 +36,22 @@ export function clampProgressEvent({
     lastPositionSeconds: Math.round(lastPositionSeconds),
     maxWatchedPercentage: Math.min(1, Math.max(0, maxWatchedPercentage)),
   };
+}
+
+/**
+ * Converts the furthest validated client position into the MVP watched
+ * metric. The canonical server duration is the only denominator accepted by
+ * the server action; a client-supplied percentage is intentionally absent.
+ */
+export function deriveProgressFromPosition({
+  positionSeconds,
+  canonicalDurationSeconds,
+}: {
+  positionSeconds: number;
+  canonicalDurationSeconds: number;
+}): ClampedProgress {
+  return clampProgressEvent({
+    positionSeconds,
+    durationSeconds: canonicalDurationSeconds,
+  });
 }

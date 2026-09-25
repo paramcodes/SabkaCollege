@@ -128,6 +128,7 @@ export default async function LessonPage({
                 embedUrl={embedUrl}
                 durationSeconds={lesson.durationSeconds}
                 initialPositionSeconds={lesson.lastPositionSeconds}
+                completed={lesson.completed}
               />
             </div>
             <div className="mt-6 flex flex-wrap items-center justify-between gap-4">

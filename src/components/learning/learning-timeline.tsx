@@ -19,7 +19,7 @@ export function LearningTimeline({
 
   return (
     <aside aria-label="Course lessons" className="space-y-4">
-      <div className="hidden rounded-none border border-foreground/20 bg-card p-5 lg:block">
+      <div className="hidden rounded-none border border-foreground/20 bg-card p-5 lg:sticky lg:top-6 lg:block">
         <TimelineList
           modules={modules}
           courseSlug={view.course.slug}
@@ -102,6 +102,7 @@ function TimelineList({
                     <Link
                       href={href}
                       aria-current={current ? "page" : undefined}
+                      aria-label={`${lesson.title}${lesson.completed ? ", completed" : ""}${current ? ", current lesson" : ""}`}
                       className={`flex min-h-10 items-center gap-3 rounded-sm px-2 py-2 text-sm hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 ${
                         current ? "bg-secondary font-semibold" : ""
                       }`}
