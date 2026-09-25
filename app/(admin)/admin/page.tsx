@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, BookOpen, CreditCard, Users } from "lucide-react";
 
+import { requireAdmin } from "@/src/lib/auth/guards";
 import { Button } from "@/src/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { getAdminOverview } from "@/src/db/queries/admin";
@@ -8,6 +9,7 @@ import { getAdminOverview } from "@/src/db/queries/admin";
 export const instant = false;
 
 export default async function AdminOverviewPage() {
+  await requireAdmin();
   const overview = await getAdminOverview();
   const cards = [
     { label: "Published courses", value: overview.courses.published ?? 0, icon: BookOpen },

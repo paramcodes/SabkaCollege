@@ -67,6 +67,7 @@ function LessonRow({
     async (_previous, formData) => {
       const result = await saveLesson({
         id: lesson.id,
+        courseId,
         moduleId,
         slug: text(formData, "slug"),
         title: text(formData, "title"),
@@ -250,6 +251,7 @@ export function LessonEditor({
   const [state, formAction, pending] = useActionState<FormState, FormData>(
     async (_previous, formData) => {
       const result = await saveLesson({
+        courseId,
         moduleId,
         slug: text(formData, "slug"),
         title: text(formData, "title"),

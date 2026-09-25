@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 
 import { db } from "@/src/db";
 import { courses, lessons, modules } from "@/src/db/schema";
@@ -31,15 +31,40 @@ export const adminCourseRepository: AdminCourseRepository = {
   async saveCourse(input) {
     const values = courseValues(input);
     if (input.id) {
+      const [current] = await db
+        .select({
+          status: courses.status,
+          publishedAt: courses.publishedAt,
+        })
+        .from(courses)
+        .where(eq(courses.id, input.id))
+        .limit(1);
+      if (!current) throw new Error("Course not found");
+      if (values.status === "published") {
+        if (current.status !== "published") {
+          throw new Error("Use the publish action to publish a course");
+        }
+        await assertCoursePublishReady(input.id);
+      }
       const [saved] = await db
         .update(courses)
-        .set({ ...values, updatedAt: new Date() })
+        .set({
+          ...values,
+          publishedAt:
+            values.status === "published"
+              ? (current.publishedAt ?? new Date())
+              : null,
+          updatedAt: new Date(),
+        })
         .where(eq(courses.id, input.id))
         .returning({ id: courses.id });
       if (!saved) throw new Error("Course not found");
       return saved;
     }
 
+    if (values.status === "published") {
+      throw new Error("Use the publish action to publish a course");
+    }
     const [saved] = await db
       .insert(courses)
       .values(values)
@@ -78,6 +103,18 @@ export const adminCourseRepository: AdminCourseRepository = {
   },
 
   async saveLesson(input) {
+    const [module] = await db
+      .select({ courseId: modules.courseId })
+      .from(modules)
+      .where(
+        and(
+          eq(modules.id, input.moduleId),
+          eq(modules.courseId, input.courseId),
+        ),
+      )
+      .limit(1);
+    if (!module) throw new Error("Module not found");
+
     let savedId = input.id;
     if (input.id) {
       const [saved] = await db
@@ -116,12 +153,6 @@ export const adminCourseRepository: AdminCourseRepository = {
       savedId = saved.id;
     }
 
-    const [module] = await db
-      .select({ courseId: modules.courseId })
-      .from(modules)
-      .where(eq(modules.id, input.moduleId))
-      .limit(1);
-    if (!module) throw new Error("Module not found");
     return { id: savedId, courseId: module.courseId };
   },
 
@@ -144,42 +175,72 @@ export const adminCourseRepository: AdminCourseRepository = {
         .set({ position, updatedAt: new Date() })
         .where(and(eq(modules.id, id), eq(modules.courseId, courseId))),
     );
-    if (staged.length > 0) {
-      await db.batch(staged as [(typeof staged)[number], ...(typeof staged)[number][]]);
-    }
-    if (normalized.length > 0) {
-      await db.batch(normalized as [(typeof normalized)[number], ...(typeof normalized)[number][]]);
+    const updates = [...staged, ...normalized];
+    if (updates.length > 0) {
+      await db.batch(updates as [(typeof updates)[number], ...(typeof updates)[number][]]);
     }
   },
 
-  async reorderLessons({ moduleId, lessonIds }) {
+  async reorderLessons({ courseId, moduleId, lessonIds }) {
+    const [module] = await db
+      .select({ id: modules.id })
+      .from(modules)
+      .where(and(eq(modules.id, moduleId), eq(modules.courseId, courseId)))
+      .limit(1);
+    if (!module) throw new Error("Module not found for course");
+
     const existing = await db
       .select({ id: lessons.id })
       .from(lessons)
-      .where(eq(lessons.moduleId, moduleId));
+      .innerJoin(modules, eq(lessons.moduleId, modules.id))
+      .where(
+        and(
+          eq(lessons.moduleId, moduleId),
+          eq(modules.courseId, courseId),
+        ),
+      );
     assertExactIds(existing.map((item) => item.id), lessonIds);
 
     const staged = lessonIds.map((id, position) =>
       db
         .update(lessons)
         .set({ position: position + 100_000, updatedAt: new Date() })
-        .where(and(eq(lessons.id, id), eq(lessons.moduleId, moduleId))),
+        .where(
+          and(
+            eq(lessons.id, id),
+            eq(lessons.moduleId, moduleId),
+          ),
+        ),
     );
     const normalized = lessonIds.map((id, position) =>
       db
         .update(lessons)
         .set({ position, updatedAt: new Date() })
-        .where(and(eq(lessons.id, id), eq(lessons.moduleId, moduleId))),
+        .where(
+          and(
+            eq(lessons.id, id),
+            eq(lessons.moduleId, moduleId),
+          ),
+        ),
     );
-    if (staged.length > 0) {
-      await db.batch(staged as [(typeof staged)[number], ...(typeof staged)[number][]]);
-    }
-    if (normalized.length > 0) {
-      await db.batch(normalized as [(typeof normalized)[number], ...(typeof normalized)[number][]]);
+    const updates = [...staged, ...normalized];
+    if (updates.length > 0) {
+      await db.batch(updates as [(typeof updates)[number], ...(typeof updates)[number][]]);
     }
   },
 
   async setCourseStatus({ courseId, status }) {
+    if (status === "published") {
+      await assertCoursePublishReady(courseId);
+    } else {
+      const [course] = await db
+        .select({ id: courses.id })
+        .from(courses)
+        .where(eq(courses.id, courseId))
+        .limit(1);
+      if (!course) throw new Error("Course not found");
+    }
+
     const [saved] = await db
       .update(courses)
       .set({
@@ -193,7 +254,12 @@ export const adminCourseRepository: AdminCourseRepository = {
   },
 
   async deleteCourse({ courseId }) {
-    await db.delete(courses).where(eq(courses.id, courseId));
+    const [deleted] = await db
+      .delete(courses)
+      .where(eq(courses.id, courseId))
+      .returning({ id: courses.id });
+    if (!deleted) throw new Error("Course not found");
+    return { courseId: deleted.id };
   },
 
   async deleteModule({ courseId, moduleId }) {
@@ -220,6 +286,39 @@ export const adminCourseRepository: AdminCourseRepository = {
     return module;
   },
 };
+
+async function assertCoursePublishReady(courseId: string) {
+  const [course] = await db
+    .select({
+      priceAmount: courses.priceAmount,
+      stripeProductId: courses.stripeProductId,
+      stripePriceId: courses.stripePriceId,
+    })
+    .from(courses)
+    .where(eq(courses.id, courseId))
+    .limit(1);
+  if (!course) throw new Error("Course not found");
+  if (
+    course.priceAmount <= 0 ||
+    !course.stripeProductId ||
+    !course.stripePriceId
+  ) {
+    throw new Error("Course is not ready to publish");
+  }
+
+  const [moduleCount] = await db
+    .select({ total: count() })
+    .from(modules)
+    .where(eq(modules.courseId, courseId));
+  const [lessonCount] = await db
+    .select({ total: count() })
+    .from(lessons)
+    .innerJoin(modules, eq(lessons.moduleId, modules.id))
+    .where(eq(modules.courseId, courseId));
+  if ((moduleCount?.total ?? 0) < 1 || (lessonCount?.total ?? 0) < 1) {
+    throw new Error("Course is not ready to publish");
+  }
+}
 
 function assertExactIds(existing: string[], requested: string[]) {
   if (

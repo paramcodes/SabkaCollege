@@ -2,6 +2,15 @@ import { z } from "zod";
 
 const nonEmptyText = z.string().trim().min(1);
 const optionalText = z.string().trim().min(1).nullable().optional();
+const slugSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(160)
+  .regex(
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+    "Use lowercase letters, numbers, and single hyphens",
+  );
 
 export const lessonVideoProviderSchema = z.enum([
   "youtube",
@@ -16,7 +25,7 @@ export const externalVideoReferenceSchema = nonEmptyText;
 
 export const lessonInputSchema = z.object({
   moduleId: z.string().uuid(),
-  slug: nonEmptyText,
+  slug: slugSchema,
   title: nonEmptyText,
   description: optionalText,
   position: z.number().int().nonnegative(),

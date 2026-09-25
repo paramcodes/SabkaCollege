@@ -2,12 +2,21 @@ import { z } from "zod";
 
 const nonEmptyText = z.string().trim().min(1);
 const optionalText = z.string().trim().min(1).nullable().optional();
+const slugSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .max(160)
+  .regex(
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+    "Use lowercase letters, numbers, and single hyphens",
+  );
 
 export const courseStatusSchema = z.enum(["draft", "published", "archived"]);
 
 export const courseInputSchema = z
   .object({
-    slug: nonEmptyText,
+    slug: slugSchema,
     title: nonEmptyText,
     shortDescription: optionalText,
     description: nonEmptyText,

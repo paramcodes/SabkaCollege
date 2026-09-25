@@ -1,58 +1,49 @@
 import { z } from "zod";
 
 import type { AppUser } from "@/src/lib/validation/user";
+import {
+  courseInputSchema,
+  moduleInputSchema,
+} from "@/src/lib/validation/course";
+import { lessonInputSchema } from "@/src/lib/validation/lesson";
 import { normalizePositions } from "@/src/lib/utils/course-order";
 
 const uuidSchema = z.string().uuid();
-const slugSchema = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .max(160)
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use lowercase letters, numbers, and hyphens");
 const optionalText = z.string().trim().min(1).nullable().optional();
 
-const saveCourseSchema = z.object({
-  id: uuidSchema.optional(),
-  slug: slugSchema,
-  title: z.string().trim().min(1).max(200),
-  shortDescription: optionalText,
-  description: z.string().trim().min(1).max(20_000),
-  coverImageUrl: z.string().url().max(2_000).nullable().optional(),
-  status: z.enum(["draft", "published", "archived"]),
-  priceAmount: z.number().int().nonnegative().max(100_000_000),
-  currency: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/),
-  stripeProductId: optionalText,
-  stripePriceId: optionalText,
-  estimatedDurationMinutes: z.number().int().nonnegative().max(100_000),
-});
+const adminCourseSchema = courseInputSchema.and(
+  z.object({
+    id: uuidSchema.optional(),
+    title: z.string().trim().min(1).max(200),
+    shortDescription: optionalText,
+    description: z.string().trim().min(1).max(20_000),
+    coverImageUrl: z.string().url().max(2_000).nullable().optional(),
+    currency: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/),
+    priceAmount: z.number().int().nonnegative().max(100_000_000),
+    estimatedDurationMinutes: z.number().int().nonnegative().max(100_000),
+  }),
+);
 
-const saveModuleSchema = z.object({
-  id: uuidSchema.optional(),
-  courseId: uuidSchema,
-  title: z.string().trim().min(1).max(200),
-  description: optionalText,
-  position: z.number().int().nonnegative().max(100_000),
-});
+const adminModuleSchema = moduleInputSchema.and(
+  z.object({
+    id: uuidSchema.optional(),
+    title: z.string().trim().min(1).max(200),
+    description: optionalText,
+    position: z.number().int().nonnegative().max(100_000),
+  }),
+);
 
-const saveLessonSchema = z.object({
-  id: uuidSchema.optional(),
-  moduleId: uuidSchema,
-  slug: slugSchema,
-  title: z.string().trim().min(1).max(200),
-  description: optionalText,
-  position: z.number().int().nonnegative().max(100_000),
-  videoProvider: z.enum([
-    "youtube",
-    "vimeo",
-    "mux",
-    "cloudflare_stream",
-    "external",
-  ]),
-  videoReference: optionalText,
-  durationSeconds: z.number().int().nonnegative().max(100_000_000),
-  isPreview: z.boolean(),
-});
+const adminLessonSchema = lessonInputSchema.and(
+  z.object({
+    id: uuidSchema.optional(),
+    courseId: uuidSchema,
+    title: z.string().trim().min(1).max(200),
+    description: optionalText,
+    position: z.number().int().nonnegative().max(100_000),
+    videoReference: optionalText,
+    durationSeconds: z.number().int().nonnegative().max(100_000_000),
+  }),
+);
 
 const uniqueUuidList = z.array(uuidSchema).min(1).max(1_000).refine(
   (ids) => new Set(ids).size === ids.length,
@@ -86,9 +77,9 @@ const deleteLessonSchema = z.object({
   lessonId: uuidSchema,
 });
 
-export type SaveCourseInput = z.input<typeof saveCourseSchema>;
-export type SaveModuleInput = z.input<typeof saveModuleSchema>;
-export type SaveLessonInput = z.input<typeof saveLessonSchema>;
+export type SaveCourseInput = z.input<typeof adminCourseSchema>;
+export type SaveModuleInput = z.input<typeof adminModuleSchema>;
+export type SaveLessonInput = z.input<typeof adminLessonSchema>;
 export type ReorderModulesInput = z.input<typeof reorderModulesSchema>;
 export type ReorderLessonsInput = z.input<typeof reorderLessonsSchema>;
 export type SetCourseStatusInput = z.input<typeof setCourseStatusSchema>;
@@ -100,7 +91,8 @@ export type AdminCourseActionErrorCode =
   | "UNAUTHENTICATED"
   | "FORBIDDEN"
   | "INVALID_INPUT"
-  | "DATABASE_ERROR";
+  | "DATABASE_ERROR"
+  | "CACHE_ERROR";
 
 export type AdminCourseActionResult<T = undefined> =
   | { ok: true; data: T }
@@ -114,19 +106,20 @@ export type AdminCourseActionResult<T = undefined> =
 
 export type AdminCourseRepository = {
   saveCourse: (
-    input: z.output<typeof saveCourseSchema>,
+    input: z.output<typeof adminCourseSchema>,
   ) => Promise<{ id: string }>;
   saveModule: (
-    input: z.output<typeof saveModuleSchema>,
+    input: z.output<typeof adminModuleSchema>,
   ) => Promise<{ id: string }>;
   saveLesson: (
-    input: z.output<typeof saveLessonSchema>,
+    input: z.output<typeof adminLessonSchema>,
   ) => Promise<{ id: string; courseId: string }>;
   reorderModules: (input: {
     courseId: string;
     moduleIds: string[];
   }) => Promise<void>;
   reorderLessons: (input: {
+    courseId: string;
     moduleId: string;
     lessonIds: string[];
   }) => Promise<void>;
@@ -134,7 +127,7 @@ export type AdminCourseRepository = {
     courseId: string;
     status: "draft" | "published" | "archived";
   }) => Promise<void>;
-  deleteCourse: (input: { courseId: string }) => Promise<void>;
+  deleteCourse: (input: { courseId: string }) => Promise<{ courseId: string }>;
   deleteModule: (input: {
     courseId: string;
     moduleId: string;
@@ -166,6 +159,14 @@ const databaseError = (): AdminCourseActionResult<never> => ({
   error: {
     code: "DATABASE_ERROR",
     message: "The course could not be saved. Please try again.",
+  },
+});
+
+const cacheError = (): AdminCourseActionResult<never> => ({
+  ok: false,
+  error: {
+    code: "CACHE_ERROR",
+    message: "The course was saved, but the page could not be refreshed. Please try again.",
   },
 });
 
@@ -218,7 +219,7 @@ export function createAdminCourseActions({
       const authorization = await authorize(requireAdmin);
       if (!authorization.ok) return authorization;
 
-      const parsed = saveCourseSchema.safeParse(input);
+      const parsed = adminCourseSchema.safeParse(input);
       if (!parsed.success) return invalidInput();
 
       const normalized = normalizePositions([
@@ -228,13 +229,19 @@ export function createAdminCourseActions({
         },
       ])[0];
 
+      let saved: { id: string };
       try {
-        const saved = await repository.saveCourse(normalized);
-        await afterCourseWrite(saved.id);
-        return { ok: true, data: saved };
+        saved = await repository.saveCourse(normalized);
       } catch {
         return databaseError();
       }
+
+      try {
+        await afterCourseWrite(saved.id);
+      } catch {
+        return cacheError();
+      }
+      return { ok: true, data: saved };
     },
 
     saveModule: async (
@@ -243,17 +250,23 @@ export function createAdminCourseActions({
       const authorization = await authorize(requireAdmin);
       if (!authorization.ok) return authorization;
 
-      const parsed = saveModuleSchema.safeParse(input);
+      const parsed = adminModuleSchema.safeParse(input);
       if (!parsed.success) return invalidInput();
       const normalized = normalizePositions([parsed.data])[0];
 
+      let saved: { id: string };
       try {
-        const saved = await repository.saveModule(normalized);
-        await afterCourseWrite(normalized.courseId);
-        return { ok: true, data: saved };
+        saved = await repository.saveModule(normalized);
       } catch {
         return databaseError();
       }
+
+      try {
+        await afterCourseWrite(normalized.courseId);
+      } catch {
+        return cacheError();
+      }
+      return { ok: true, data: saved };
     },
 
     saveLesson: async (
@@ -262,17 +275,23 @@ export function createAdminCourseActions({
       const authorization = await authorize(requireAdmin);
       if (!authorization.ok) return authorization;
 
-      const parsed = saveLessonSchema.safeParse(input);
+      const parsed = adminLessonSchema.safeParse(input);
       if (!parsed.success) return invalidInput();
       const normalized = normalizePositions([parsed.data])[0];
 
+      let saved: { id: string; courseId: string };
       try {
-        const saved = await repository.saveLesson(normalized);
-        await afterCourseWrite(saved.courseId);
-        return { ok: true, data: { id: saved.id } };
+        saved = await repository.saveLesson(normalized);
       } catch {
         return databaseError();
       }
+
+      try {
+        await afterCourseWrite(saved.courseId);
+      } catch {
+        return cacheError();
+      }
+      return { ok: true, data: { id: saved.id } };
     },
 
     reorderModules: async (
@@ -287,16 +306,21 @@ export function createAdminCourseActions({
 
       try {
         await repository.reorderModules({ ...parsed.data, moduleIds });
-        await afterCourseWrite(parsed.data.courseId);
-        return { ok: true, data: { courseId: parsed.data.courseId } };
       } catch {
         return databaseError();
       }
+
+      try {
+        await afterCourseWrite(parsed.data.courseId);
+      } catch {
+        return cacheError();
+      }
+      return { ok: true, data: { courseId: parsed.data.courseId } };
     },
 
     reorderLessons: async (
       input: ReorderLessonsInput,
-    ): Promise<AdminCourseActionResult<{ moduleId: string }>> => {
+    ): Promise<AdminCourseActionResult<{ courseId: string }>> => {
       const authorization = await authorize(requireAdmin);
       if (!authorization.ok) return authorization;
 
@@ -306,14 +330,20 @@ export function createAdminCourseActions({
 
       try {
         await repository.reorderLessons({
+          courseId: parsed.data.courseId,
           moduleId: parsed.data.moduleId,
           lessonIds,
         });
-        await afterCourseWrite(parsed.data.courseId);
-        return { ok: true, data: { moduleId: parsed.data.moduleId } };
       } catch {
         return databaseError();
       }
+
+      try {
+        await afterCourseWrite(parsed.data.courseId);
+      } catch {
+        return cacheError();
+      }
+      return { ok: true, data: { courseId: parsed.data.courseId } };
     },
 
     setCourseStatus: async (
@@ -327,11 +357,16 @@ export function createAdminCourseActions({
 
       try {
         await repository.setCourseStatus(parsed.data);
-        await afterCourseWrite(parsed.data.courseId);
-        return { ok: true, data: { courseId: parsed.data.courseId } };
       } catch {
         return databaseError();
       }
+
+      try {
+        await afterCourseWrite(parsed.data.courseId);
+      } catch {
+        return cacheError();
+      }
+      return { ok: true, data: { courseId: parsed.data.courseId } };
     },
 
     deleteCourse: async (
@@ -343,13 +378,19 @@ export function createAdminCourseActions({
       const parsed = deleteCourseSchema.safeParse(input);
       if (!parsed.success) return invalidInput();
 
+      let deleted: { courseId: string };
       try {
-        await repository.deleteCourse(parsed.data);
-        await invalidateCourse(parsed.data.courseId);
-        return { ok: true, data: { courseId: parsed.data.courseId } };
+        deleted = await repository.deleteCourse(parsed.data);
       } catch {
         return databaseError();
       }
+
+      try {
+        await invalidateCourse(deleted.courseId);
+      } catch {
+        return cacheError();
+      }
+      return { ok: true, data: deleted };
     },
 
     deleteModule: async (
@@ -361,13 +402,19 @@ export function createAdminCourseActions({
       const parsed = deleteModuleSchema.safeParse(input);
       if (!parsed.success) return invalidInput();
 
+      let deleted: { courseId: string };
       try {
-        const deleted = await repository.deleteModule(parsed.data);
-        await afterCourseWrite(deleted.courseId);
-        return { ok: true, data: deleted };
+        deleted = await repository.deleteModule(parsed.data);
       } catch {
         return databaseError();
       }
+
+      try {
+        await afterCourseWrite(deleted.courseId);
+      } catch {
+        return cacheError();
+      }
+      return { ok: true, data: deleted };
     },
 
     deleteLesson: async (
@@ -379,13 +426,19 @@ export function createAdminCourseActions({
       const parsed = deleteLessonSchema.safeParse(input);
       if (!parsed.success) return invalidInput();
 
+      let deleted: { courseId: string };
       try {
-        const deleted = await repository.deleteLesson(parsed.data);
-        await afterCourseWrite(deleted.courseId);
-        return { ok: true, data: deleted };
+        deleted = await repository.deleteLesson(parsed.data);
       } catch {
         return databaseError();
       }
+
+      try {
+        await afterCourseWrite(deleted.courseId);
+      } catch {
+        return cacheError();
+      }
+      return { ok: true, data: deleted };
     },
   };
 }

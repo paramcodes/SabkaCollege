@@ -24,7 +24,7 @@ const repository = {
   reorderModules: vi.fn(async () => undefined),
   reorderLessons: vi.fn(async () => undefined),
   setCourseStatus: vi.fn(async () => undefined),
-  deleteCourse: vi.fn(async () => undefined),
+  deleteCourse: vi.fn(async () => ({ courseId })),
   deleteModule: vi.fn(async () => ({ courseId })),
   deleteLesson: vi.fn(async () => ({ courseId })),
 };
@@ -68,6 +68,7 @@ const validInputs = {
   },
   saveLesson: {
     id: lessonId,
+    courseId,
     moduleId,
     slug: "  course-outline  ",
     title: "  Course outline  ",
@@ -223,5 +224,64 @@ describe("admin course action success", () => {
       courseId,
       moduleIds: [secondModuleId, moduleId],
     });
+  });
+
+  it("passes course ownership through lesson reordering", async () => {
+    const result = await actions.reorderLessons({
+      ...validInputs.reorderLessons,
+      lessonIds: [...validInputs.reorderLessons.lessonIds],
+    });
+
+    expect(result).toEqual({ ok: true, data: { courseId } });
+    expect(repository.reorderLessons).toHaveBeenCalledWith({
+      courseId,
+      moduleId,
+      lessonIds: [lessonId],
+    });
+  });
+
+  it("does not report a cache failure as a database failure", async () => {
+    invalidateCourse.mockRejectedValueOnce(new Error("cache unavailable"));
+
+    const result = await actions.saveCourse(validInputs.saveCourse);
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: "CACHE_ERROR",
+        message: "The course was saved, but the page could not be refreshed. Please try again.",
+      },
+    });
+    expect(repository.saveCourse).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects publishing when the repository reports incomplete content", async () => {
+    repository.setCourseStatus.mockRejectedValueOnce(
+      new Error("Course is not ready to publish"),
+    );
+
+    const result = await actions.setCourseStatus({
+      courseId,
+      status: "published",
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: "DATABASE_ERROR",
+        message: "The course could not be saved. Please try again.",
+      },
+    });
+    expect(invalidateCourse).not.toHaveBeenCalled();
+  });
+
+  it("reports a missing course as a database error", async () => {
+    repository.deleteCourse.mockRejectedValueOnce(new Error("Course not found"));
+
+    const result = await actions.deleteCourse({ courseId });
+
+    expect(result.ok).toBe(false);
+    expect(repository.deleteCourse).toHaveBeenCalledTimes(1);
+    expect(invalidateCourse).not.toHaveBeenCalled();
   });
 });

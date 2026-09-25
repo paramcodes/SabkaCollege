@@ -1,6 +1,6 @@
 import "server-only";
 
-import { asc, count, desc, eq } from "drizzle-orm";
+import { and, asc, count, countDistinct, desc, eq } from "drizzle-orm";
 
 import { db } from "@/src/db";
 import { ADMIN_PAGE_SIZE, normalizeAdminPage } from "@/src/lib/admin/pagination";
@@ -12,7 +12,11 @@ export async function getAdminOverview() {
       .select({ status: courses.status, total: count() })
       .from(courses)
       .groupBy(courses.status),
-    db.select({ total: count() }).from(users),
+    db
+      .select({ total: countDistinct(users.id) })
+      .from(users)
+      .innerJoin(purchases, eq(users.id, purchases.userId))
+      .where(and(eq(users.role, "student"), eq(purchases.status, "paid"))),
     db.select({ total: count() }).from(purchases),
   ]);
 
@@ -100,6 +104,9 @@ export async function getAdminStudents(page: number) {
       createdAt: users.createdAt,
     })
     .from(users)
+    .innerJoin(purchases, eq(users.id, purchases.userId))
+    .where(and(eq(users.role, "student"), eq(purchases.status, "paid")))
+    .groupBy(users.id, users.email, users.name, users.role, users.createdAt)
     .orderBy(desc(users.createdAt), asc(users.email))
     .limit(ADMIN_PAGE_SIZE + 1)
     .offset((safePage - 1) * ADMIN_PAGE_SIZE);
