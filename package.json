@@ -16,6 +16,8 @@
     "db:seed": "bun --conditions=react-server scripts/seed.ts"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.9.7",
+    "@clerk/ui": "^1.36.0",
     "@neondatabase/serverless": "^1.1.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",

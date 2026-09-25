@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
+import { shadcn } from "@clerk/ui/themes";
 import { MotionProvider } from "@/src/components/motion/reduced-motion-provider";
 import "./globals.css";
 
@@ -26,7 +28,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen antialiased`}
       >
-        <MotionProvider>{children}</MotionProvider>
+        <ClerkProvider appearance={{ theme: shadcn }}>
+          <MotionProvider>{children}</MotionProvider>
+        </ClerkProvider>
       </body>
     </html>
   );
