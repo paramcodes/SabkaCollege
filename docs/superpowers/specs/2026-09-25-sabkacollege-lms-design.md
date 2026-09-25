@@ -219,7 +219,7 @@ Clerk is the source of truth for identities, sessions, and public role metadata.
 - `updatedAt`
 - unique constraint on `userId` and `lessonId`
 
-The entitlement check is derived from an active paid Stripe purchase for the user and course. Purchases are not duplicated when Stripe retries a webhook.
+The entitlement check is derived from an active paid Stripe purchase for the user and course. Purchases are not duplicated when Stripe retries a webhook. Public catalog, syllabus, and preview pages do not query entitlements; the authenticated course overview may check the current user's entitlement only to render a Continue learning link.
 
 ## 7. Request and Data Flows
 

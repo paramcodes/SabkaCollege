@@ -502,7 +502,7 @@ Verify the raw body with `STRIPE_WEBHOOK_SECRET` before parsing. Map checkout/pa
 
 - [ ] **Step 5: Implement access checks**
 
-`hasCourseAccess` returns true only for a matching `paid` purchase. Students with a refunded or revoked purchase lose learning access. Public course pages do not call this function.
+`hasCourseAccess` returns true only for a matching `paid` purchase. Students with a refunded or revoked purchase lose learning access. Public catalog, syllabus, and preview pages do not call this function; the authenticated course overview may check the current user's entitlement only to render a Continue learning link.
 
 - [ ] **Step 6: Run tests and quality checks**
 
