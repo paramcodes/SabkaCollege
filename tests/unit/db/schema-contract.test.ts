@@ -137,8 +137,8 @@ describe("database schema contract", () => {
       "status",
       "price_amount",
       "currency",
-      "clerk_product_id",
-      "clerk_price_id",
+      "stripe_product_id",
+      "stripe_price_id",
       "estimated_duration_minutes",
       "published_at",
       "created_at",
@@ -156,8 +156,8 @@ describe("database schema contract", () => {
     expect(column(courses, "price_amount").getSQLType()).toBe("integer");
     expect(column(courses, "price_amount").notNull).toBe(true);
     expect(column(courses, "currency").notNull).toBe(true);
-    expect(column(courses, "clerk_product_id").notNull).toBe(false);
-    expect(column(courses, "clerk_price_id").notNull).toBe(false);
+    expect(column(courses, "stripe_product_id").notNull).toBe(false);
+    expect(column(courses, "stripe_price_id").notNull).toBe(false);
     expect(column(courses, "estimated_duration_minutes").getSQLType()).toBe(
       "integer",
     );
@@ -213,7 +213,10 @@ describe("database schema contract", () => {
   it("defines purchase and lesson-progress persistence fields", () => {
     expect(columnNames(purchases)).toEqual([
       "id",
-      "clerk_purchase_id",
+      "stripe_checkout_session_id",
+      "stripe_payment_intent_id",
+      "stripe_product_id",
+      "stripe_price_id",
       "user_id",
       "course_id",
       "amount",
@@ -223,7 +226,10 @@ describe("database schema contract", () => {
       "created_at",
       "updated_at",
     ]);
-    expect(column(purchases, "clerk_purchase_id").notNull).toBe(true);
+    expect(column(purchases, "stripe_checkout_session_id").notNull).toBe(false);
+    expect(column(purchases, "stripe_payment_intent_id").notNull).toBe(true);
+    expect(column(purchases, "stripe_product_id").notNull).toBe(false);
+    expect(column(purchases, "stripe_price_id").notNull).toBe(false);
     expect(column(purchases, "user_id").getSQLType()).toBe("text");
     expect(column(purchases, "amount").getSQLType()).toBe("integer");
     expect(column(purchases, "amount").notNull).toBe(true);
@@ -320,9 +326,9 @@ describe("database schema contract", () => {
       columns: ["module_id", "position"],
     });
     expect(indexes(purchases)).toContainEqual({
-      name: "purchases_clerk_purchase_id_uidx",
+      name: "purchases_stripe_payment_intent_id_uidx",
       unique: true,
-      columns: ["clerk_purchase_id"],
+      columns: ["stripe_payment_intent_id"],
     });
     expect(indexes(lessonProgress)).toContainEqual({
       name: "lesson_progress_user_lesson_uidx",

@@ -26,7 +26,10 @@ export const purchases = pgTable(
   "purchases",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    clerkPurchaseId: text("clerk_purchase_id").notNull(),
+    stripeCheckoutSessionId: text("stripe_checkout_session_id"),
+    stripePaymentIntentId: text("stripe_payment_intent_id").notNull(),
+    stripeProductId: text("stripe_product_id"),
+    stripePriceId: text("stripe_price_id"),
     /** Clerk user ID, matching `users.id`. */
     userId: text("user_id")
       .notNull()
@@ -48,7 +51,9 @@ export const purchases = pgTable(
       .notNull(),
   },
   (table) => [
-    uniqueIndex("purchases_clerk_purchase_id_uidx").on(table.clerkPurchaseId),
+    uniqueIndex("purchases_stripe_payment_intent_id_uidx").on(
+      table.stripePaymentIntentId,
+    ),
     index("purchases_user_id_idx").on(table.userId),
     index("purchases_course_id_idx").on(table.courseId),
     check("purchases_amount_nonnegative", sql`${table.amount} >= 0`),

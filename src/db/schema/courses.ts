@@ -28,8 +28,8 @@ export const courses = pgTable(
     /** Integer minor units (paise/cents) to avoid floating point money. */
     priceAmount: integer("price_amount").default(0).notNull(),
     currency: text("currency").default("INR").notNull(),
-    clerkProductId: text("clerk_product_id"),
-    clerkPriceId: text("clerk_price_id"),
+    stripeProductId: text("stripe_product_id"),
+    stripePriceId: text("stripe_price_id"),
     estimatedDurationMinutes: integer("estimated_duration_minutes")
       .default(0)
       .notNull(),
@@ -44,7 +44,7 @@ export const courses = pgTable(
   (table) => [
     uniqueIndex("courses_slug_uidx").on(table.slug),
     index("courses_status_idx").on(table.status),
-    index("courses_clerk_price_id_idx").on(table.clerkPriceId),
+    index("courses_stripe_price_id_idx").on(table.stripePriceId),
     check("courses_price_amount_nonnegative", sql`${table.priceAmount} >= 0`),
     check(
       "courses_estimated_duration_minutes_nonnegative",
