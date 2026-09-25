@@ -10,6 +10,17 @@ export type ClerkUserIdentity = {
   publicMetadata: Record<string, unknown>;
 };
 
+export type AppUserSyncValues = Pick<
+  AppUser,
+  | "id"
+  | "email"
+  | "name"
+  | "avatarUrl"
+  | "role"
+  | "lastSyncedAt"
+  | "updatedAt"
+>;
+
 export const normalizeUserRole = (value: unknown): UserRole =>
   value === "admin" ? "admin" : "student";
 
@@ -22,6 +33,19 @@ export const buildAppUserSyncValues = (
   name: identity.name,
   avatarUrl: identity.avatarUrl,
   role: normalizeUserRole(identity.publicMetadata.role),
+  lastSyncedAt: syncedAt,
+  updatedAt: syncedAt,
+});
+
+export const buildAppUserTombstoneValues = (
+  userId: string,
+  syncedAt = new Date(),
+): AppUserSyncValues => ({
+  id: userId,
+  email: `tombstone+${userId}@users.invalid`,
+  name: null,
+  avatarUrl: null,
+  role: "student",
   lastSyncedAt: syncedAt,
   updatedAt: syncedAt,
 });

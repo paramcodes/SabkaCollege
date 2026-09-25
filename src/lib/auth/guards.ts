@@ -1,9 +1,10 @@
-import { canAccessAdmin } from "./roles";
 import type { AppUser } from "@/src/lib/validation/user";
+import { canAccessAdmin } from "./roles";
+import { getCurrentAppUser } from "./session";
 
-export const requireUser = async (
-  user: AppUser | null | undefined,
-): Promise<AppUser> => {
+export const requireUser = async (): Promise<AppUser> => {
+  const user = await getCurrentAppUser();
+
   if (!user) {
     throw new Error("Authentication required");
   }
@@ -11,14 +12,16 @@ export const requireUser = async (
   return user;
 };
 
-export const requireAdmin = async (
-  user: AppUser | null | undefined,
-): Promise<AppUser> => {
-  const authenticatedUser = await requireUser(user);
+export const requireAdmin = async (): Promise<AppUser> => {
+  const user = await getCurrentAppUser();
 
-  if (!canAccessAdmin(authenticatedUser)) {
+  if (!user) {
+    throw new Error("Authentication required");
+  }
+
+  if (!canAccessAdmin(user)) {
     throw new Error("Admin access required");
   }
 
-  return authenticatedUser;
+  return user;
 };

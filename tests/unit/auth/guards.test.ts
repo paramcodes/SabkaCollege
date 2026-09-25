@@ -1,7 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { requireAdmin, requireUser } from "../../../src/lib/auth/guards";
 import type { AppUser } from "../../../src/lib/validation/user";
+
+const getCurrentAppUserMock = vi.fn<() => Promise<AppUser | null>>();
+
+vi.mock("server-only", () => ({}));
+vi.mock("../../../src/lib/auth/session", () => ({
+  getCurrentAppUser: getCurrentAppUserMock,
+}));
+
+const { requireAdmin, requireUser } = await import(
+  "../../../src/lib/auth/guards"
+);
 
 const appUser = (role: AppUser["role"]): AppUser => ({
   id: `user_${role}`,
@@ -15,25 +25,36 @@ const appUser = (role: AppUser["role"]): AppUser => ({
 });
 
 describe("server authorization guards", () => {
-  it("rejects a missing user", async () => {
-    await expect(requireUser(null)).rejects.toThrow("Authentication required");
+  beforeEach(() => {
+    getCurrentAppUserMock.mockReset();
+    getCurrentAppUserMock.mockResolvedValue(null);
   });
 
-  it("returns an authenticated user", async () => {
+  it("rejects a missing server-side user", async () => {
+    await expect(requireUser()).rejects.toThrow("Authentication required");
+  });
+
+  it("returns the user resolved from the server session", async () => {
     const user = appUser("student");
+    getCurrentAppUserMock.mockResolvedValue(user);
 
-    await expect(requireUser(user)).resolves.toBe(user);
+    await expect(requireUser()).resolves.toBe(user);
   });
 
-  it("rejects a student attempting an admin mutation", async () => {
-    await expect(requireAdmin(appUser("student"))).rejects.toThrow(
-      "Admin access required",
-    );
+  it("rejects a server-side student attempting an admin mutation", async () => {
+    getCurrentAppUserMock.mockResolvedValue(appUser("student"));
+
+    await expect(requireAdmin()).rejects.toThrow("Admin access required");
   });
 
-  it("returns an authenticated admin", async () => {
+  it("rejects an admin attempt without a server-side session", async () => {
+    await expect(requireAdmin()).rejects.toThrow("Authentication required");
+  });
+
+  it("returns a server-side admin", async () => {
     const user = appUser("admin");
+    getCurrentAppUserMock.mockResolvedValue(user);
 
-    await expect(requireAdmin(user)).resolves.toBe(user);
+    await expect(requireAdmin()).resolves.toBe(user);
   });
 });

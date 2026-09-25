@@ -1,6 +1,5 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
 import type { User } from "@clerk/backend";
 import type {
   UserWebhookEvent,
@@ -11,10 +10,11 @@ import { db } from "@/src/db";
 import { users } from "@/src/db/schema/users";
 import {
   buildAppUserSyncValues,
+  buildAppUserTombstoneValues,
   getRequiredEmail,
   getRequiredUserId,
   type AppUser,
-  type ClerkUserIdentity,
+  type AppUserSyncValues,
 } from "@/src/lib/validation/user";
 
 const joinName = (firstName: string | null, lastName: string | null) => {
@@ -22,10 +22,10 @@ const joinName = (firstName: string | null, lastName: string | null) => {
   return name || null;
 };
 
-const syncClerkUserIdentity = async (
-  identity: ClerkUserIdentity,
+const upsertAppUser = async (
+  values: AppUserSyncValues,
 ): Promise<AppUser> => {
-  const { id, ...updates } = buildAppUserSyncValues(identity);
+  const { id, ...updates } = values;
   const [appUser] = await db
     .insert(users)
     .values({ id, ...updates })
@@ -46,19 +46,22 @@ export const syncCurrentClerkUser = async (user: User): Promise<AppUser> => {
   const email =
     user.primaryEmailAddress?.emailAddress ?? user.emailAddresses[0]?.emailAddress;
 
-  return syncClerkUserIdentity({
-    id: getRequiredUserId(user.id),
-    email: getRequiredEmail(email),
-    name: user.fullName ?? joinName(user.firstName, user.lastName),
-    avatarUrl: user.imageUrl || null,
-    publicMetadata: user.publicMetadata,
-  });
+  return upsertAppUser(
+    buildAppUserSyncValues({
+      id: getRequiredUserId(user.id),
+      email: getRequiredEmail(email),
+      name: user.fullName ?? joinName(user.firstName, user.lastName),
+      avatarUrl: user.imageUrl || null,
+      publicMetadata: user.publicMetadata,
+    }),
+  );
 };
 
 export const syncClerkUser = async (event: UserWebhookEvent): Promise<void> => {
   if (event.type === "user.deleted") {
-    const id = getRequiredUserId(event.data.id);
-    await db.delete(users).where(eq(users.id, id));
+    await upsertAppUser(
+      buildAppUserTombstoneValues(getRequiredUserId(event.data.id)),
+    );
     return;
   }
 
@@ -67,13 +70,15 @@ export const syncClerkUser = async (event: UserWebhookEvent): Promise<void> => {
       (email) => email.id === event.data.primary_email_address_id,
     ) ?? event.data.email_addresses[0];
 
-  await syncClerkUserIdentity({
-    id: getRequiredUserId(event.data.id),
-    email: getRequiredEmail(primaryEmail?.email_address),
-    name: joinName(event.data.first_name, event.data.last_name),
-    avatarUrl: event.data.image_url || null,
-    publicMetadata: event.data.public_metadata,
-  });
+  await upsertAppUser(
+    buildAppUserSyncValues({
+      id: getRequiredUserId(event.data.id),
+      email: getRequiredEmail(primaryEmail?.email_address),
+      name: joinName(event.data.first_name, event.data.last_name),
+      avatarUrl: event.data.image_url || null,
+      publicMetadata: event.data.public_metadata,
+    }),
+  );
 };
 
 export const isUserWebhookEvent = (
