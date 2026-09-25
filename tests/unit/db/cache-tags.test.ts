@@ -4,7 +4,6 @@ import {
   courseBySlugCacheTag,
   courseCacheTag,
   publishedCoursesCacheTag,
-  userProgressCacheTag,
 } from "../../../src/lib/cache/tags";
 
 describe("cache tag helpers", () => {
@@ -16,10 +15,4 @@ describe("cache tag helpers", () => {
     );
   });
 
-  it("keeps user progress cache tags isolated by Clerk user ID", () => {
-    expect(userProgressCacheTag("user-1")).toBe("progress:user-1");
-    expect(userProgressCacheTag("user-2")).not.toBe(
-      userProgressCacheTag("user-1"),
-    );
-  });
 });

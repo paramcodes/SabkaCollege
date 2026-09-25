@@ -13,6 +13,7 @@ import { courses, lessons, modules } from "../schema";
 import {
   previewLessonPublicColumns,
   previewLessonWhere,
+  publishedCourseCatalogOrderBy,
   publishedCourseWhere,
   publishedCourseWithSyllabus,
 } from "./query-boundaries";
@@ -25,6 +26,7 @@ export async function getPublishedCourses() {
   return db.query.courses.findMany({
     ...publishedCourseWithSyllabus(),
     where: publishedCourseWhere(),
+    orderBy: publishedCourseCatalogOrderBy,
   });
 }
 
@@ -62,7 +64,10 @@ export async function getCourseSyllabus(courseId: string) {
   return course ?? null;
 }
 
-export async function getPublicPreviewLesson(courseSlug: string, lessonId: string) {
+export async function getPublicPreviewLesson(
+  courseSlug: string,
+  lessonSlug: string,
+) {
   "use cache";
 
   cacheTag(publishedCoursesCacheTag, courseBySlugCacheTag(courseSlug));
@@ -72,7 +77,7 @@ export async function getPublicPreviewLesson(courseSlug: string, lessonId: strin
     .from(lessons)
     .innerJoin(modules, eq(lessons.moduleId, modules.id))
     .innerJoin(courses, eq(modules.courseId, courses.id))
-    .where(previewLessonWhere(courseSlug, lessonId))
+    .where(previewLessonWhere(courseSlug, lessonSlug))
     .limit(1);
 
   if (preview) {

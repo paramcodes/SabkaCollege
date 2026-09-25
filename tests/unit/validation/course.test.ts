@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { courseInputSchema } from "../../../src/lib/validation/course";
 import { lessonInputSchema } from "../../../src/lib/validation/lesson";
-import { progressUpdateSchema } from "../../../src/lib/validation/progress";
+import {
+  progressUpdateSchema,
+  userIdSchema,
+} from "../../../src/lib/validation/progress";
 
 const course = {
   slug: "course-slug",
@@ -67,6 +70,15 @@ describe("progress validation", () => {
 
   it("accepts finite positions and percentages in range", () => {
     expect(progressUpdateSchema.parse(progress)).toMatchObject(progress);
+  });
+
+  it("uses one trimmed non-empty user ID rule", () => {
+    expect(userIdSchema.parse("  user_123  ")).toBe("user_123");
+    expect(
+      progressUpdateSchema.parse({ ...progress, userId: "  user_123  " })
+        .userId,
+    ).toBe("user_123");
+    expect(userIdSchema.safeParse("  ").success).toBe(false);
   });
 
   it("rejects negative, non-finite, and out-of-range progress values", () => {

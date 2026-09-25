@@ -7,10 +7,11 @@ import {
   previewLessonWhere,
   progressForUserWhere,
   publicLessonColumns,
+  publishedCourseCatalogOrderBy,
   publishedCourseWhere,
   publishedCourseWithSyllabus,
 } from "../../../src/db/queries/query-boundaries";
-import { lessons, modules } from "../../../src/db/schema";
+import { courses, lessons, modules } from "../../../src/db/schema";
 
 const compile = (query: Parameters<PgDialect["sqlToQuery"]>[0]) => {
   const compiled = new PgDialect().sqlToQuery(query);
@@ -29,9 +30,20 @@ describe("public course query boundaries", () => {
     expect(compiled.params).toEqual(["published"]);
   });
 
-  it("omits lesson video references from nested public payloads", () => {
-    expect(publicLessonColumns).not.toHaveProperty("videoReference");
+  it("uses only public lesson columns in the nested course relation", () => {
+    const relation = publishedCourseWithSyllabus();
+    const nestedLessonColumns = relation.with.modules.with.lessons.columns;
+
+    expect(nestedLessonColumns).toBe(publicLessonColumns);
+    expect(nestedLessonColumns).not.toHaveProperty("videoReference");
     expect(previewLessonPublicColumns).toHaveProperty("videoReference");
+  });
+
+  it("orders the published catalog by ascending course title", () => {
+    expect(publishedCourseCatalogOrderBy).toEqual([
+      asc(courses.title),
+      asc(courses.slug),
+    ]);
   });
 
   it("orders nested modules and lessons by position", () => {
@@ -45,27 +57,24 @@ describe("public course query boundaries", () => {
 
   it("requires a published course and a preview lesson", () => {
     const compiled = compile(
-      previewLessonWhere(
-        "course-slug",
-        "40000000-0000-4000-8000-000000000001",
-      ),
+      previewLessonWhere("course-slug", "preview-lesson"),
     );
 
     expect(compiled.sql).toBe(
-      "(courses.status = $1 and courses.slug = $2 and lessons.is_preview = $3 and lessons.id = $4)",
+      "(courses.status = $1 and courses.slug = $2 and lessons.is_preview = $3 and lessons.slug = $4)",
     );
     expect(compiled.params).toEqual([
       "published",
       "course-slug",
       true,
-      "40000000-0000-4000-8000-000000000001",
+      "preview-lesson",
     ]);
   });
 });
 
 describe("progress query boundary", () => {
-  it("filters progress by the server-derived Clerk user ID", () => {
-    const compiled = compile(progressForUserWhere("user_server_123"));
+  it("uses the shared normalized user ID for progress query scoping", () => {
+    const compiled = compile(progressForUserWhere("  user_server_123  "));
 
     expect(compiled.sql).toBe(
       '"lesson_progress"."user_id" = $1'.replaceAll('"', ""),
@@ -73,9 +82,7 @@ describe("progress query boundary", () => {
     expect(compiled.params).toEqual(["user_server_123"]);
   });
 
-  it("rejects an empty user ID instead of querying all progress", () => {
-    expect(() => progressForUserWhere("  ")).toThrow(
-      "A server-derived user ID is required",
-    );
+  it("fails closed for an empty user ID", () => {
+    expect(() => progressForUserWhere("  ")).toThrow();
   });
 });

@@ -1,5 +1,6 @@
 import { and, asc, eq, type SQL } from "drizzle-orm";
 
+import { userIdSchema } from "../../lib/validation/progress";
 import {
   courses,
   lessonProgress,
@@ -72,23 +73,28 @@ export const publishedCourseWithSyllabus = () => ({
 export const publishedCourseWhere = (): SQL =>
   eq(courses.status, "published");
 
+export const publishedCourseCatalogOrderBy: SQL[] = [
+  asc(courses.title),
+  asc(courses.slug),
+];
+
 export const previewLessonWhere = (
   courseSlug: string,
-  lessonId: string,
+  lessonSlug: string,
 ): SQL =>
   and(
     eq(courses.status, "published"),
     eq(courses.slug, courseSlug),
     eq(lessons.isPreview, true),
-    eq(lessons.id, lessonId),
+    eq(lessons.slug, lessonSlug),
   ) as SQL;
 
 export const progressForUserWhere = (userId: string): SQL => {
-  const normalizedUserId = userId.trim();
+  const parsedUserId = userIdSchema.safeParse(userId);
 
-  if (!normalizedUserId) {
+  if (!parsedUserId.success) {
     throw new Error("A server-derived user ID is required.");
   }
 
-  return eq(lessonProgress.userId, normalizedUserId);
+  return eq(lessonProgress.userId, parsedUserId.data);
 };
