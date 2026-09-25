@@ -319,7 +319,9 @@ git commit -m "feat: add Drizzle schema and deterministic seed data"
 ### Task 4: Add Clerk Authentication, User Sync, and Admin Authorization
 
 **Files:**
-- Modify: `proxy.ts`
+- Create: `proxy.ts`
+- Create: `app/(auth)/sign-in/[[...sign-in]]/page.tsx`
+- Create: `app/(auth)/sign-up/[[...sign-up]]/page.tsx`
 - Create: `src/lib/auth/session.ts`
 - Create: `src/lib/auth/roles.ts`
 - Create: `src/lib/auth/guards.ts`
@@ -377,7 +379,7 @@ bun run lint
 - [ ] **Step 6: Commit**
 
 ```bash
-git add proxy.ts src/lib/auth app/api/webhooks/clerk src/lib/validation/user.ts tests/unit/auth
+git add proxy.ts 'app/(auth)' src/lib/auth app/api/webhooks/clerk src/lib/validation/user.ts tests/unit/auth
 git commit -m "feat: add Clerk auth and admin guards"
 ```
 
@@ -399,6 +401,7 @@ git commit -m "feat: add Clerk auth and admin guards"
 
 **Interfaces:**
 - Produces: `getPublishedCourses()`, `getPublishedCourseBySlug(slug)`, and `getCourseSyllabus(courseId)`.
+- Produces: `getPublicPreviewLesson(courseSlug, lessonId)` that returns video data only when the lesson belongs to a published course and `isPreview` is true.
 - Produces: `calculateCourseProgress(totalLessons, completedLessons): number`.
 - Produces: `shouldAutoComplete(maxWatchedPercentage): boolean`.
 - Produces: `normalizePositions<T extends { position: number }>(items: T[]): T[]`.
@@ -574,6 +577,8 @@ git commit -m "feat: build SabkaCollege landing experience"
 - Create: `app/(catalog)/courses/page.tsx`
 - Create: `app/(catalog)/courses/[courseSlug]/page.tsx`
 - Create: `app/(catalog)/courses/[courseSlug]/syllabus/page.tsx`
+- Create: `app/(catalog)/courses/[courseSlug]/preview/[lessonSlug]/page.tsx`
+- Create: `src/components/catalog/public-preview-player.tsx`
 - Create: `src/lib/validation/catalog-search.ts`
 - Test: `tests/unit/catalog/search.test.ts`
 - Test: `tests/e2e/catalog.spec.ts`
@@ -597,7 +602,7 @@ Render title, description, outcomes, instructor metadata, duration, lesson count
 
 - [ ] **Step 4: Build the syllabus page**
 
-Render the complete module/lesson outline. Show lock icons for non-preview lessons. Do not render video provider references or playable media for locked lessons. Link preview lessons to a safe public preview route only after the preview adapter exists; until then render a disabled preview call to action rather than exposing the video URL.
+Render the complete module/lesson outline. Show lock icons for non-preview lessons. Do not render video provider references or playable media for locked lessons. Link preview lessons to `/courses/[courseSlug]/preview/[lessonSlug]`, where `getPublicPreviewLesson` verifies the published course and `isPreview` flag before rendering the provider-safe player.
 
 - [ ] **Step 5: Verify catalog and course routes**
 

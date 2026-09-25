@@ -107,6 +107,7 @@ src/
 - `/courses` — course catalog
 - `/courses/[courseSlug]` — course overview and purchase CTA
 - `/courses/[courseSlug]/syllabus` — full public course plan
+- `/courses/[courseSlug]/preview/[lessonSlug]` — public preview lesson player
 - `/pricing` — purchase information and FAQ
 - `/blog` — blog index
 - `/blog/[slug]` — blog article
