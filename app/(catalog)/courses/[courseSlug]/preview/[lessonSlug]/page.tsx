@@ -5,7 +5,9 @@ import { connection } from "next/server";
 import { ArrowLeft, BookOpen, Clock3 } from "lucide-react";
 
 import { PublicPreviewPlayer } from "@/src/components/catalog/public-preview-player";
+import { RetryButton } from "@/src/components/layout/retry-button";
 import { Button } from "@/src/components/ui/button";
+import { logServerError } from "@/src/lib/logging/server-error";
 import {
   courseSlugSchema,
   lessonSlugSchema,
@@ -38,6 +40,8 @@ async function getPublicPreview(
     return { status: "unavailable" };
   }
 
+  // `connection()` stays outside the try: the dynamic-boundary signal must
+  // never be swallowed into a user-facing unavailable state.
   await connection();
 
   try {
@@ -49,8 +53,8 @@ async function getPublicPreview(
     return preview
       ? { status: "ready", preview }
       : { status: "not-found" };
-  } catch {
-    console.error("Unable to load the public lesson preview");
+  } catch (error) {
+    logServerError("catalog.preview", error);
     return { status: "unavailable" };
   }
 }
@@ -89,9 +93,12 @@ export default async function PublicPreviewPage({
         <p className="mx-auto mt-5 max-w-xl text-lg leading-8 text-muted-foreground">
           We could not load this public preview safely. Please try again soon.
         </p>
-        <Button asChild variant="outline" className="mt-8">
-          <Link href={coursePath(courseSlug)}>Return to course</Link>
-        </Button>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <RetryButton />
+          <Button asChild variant="outline">
+            <Link href={coursePath(courseSlug)}>Return to course</Link>
+          </Button>
+        </div>
       </div>
     );
   }

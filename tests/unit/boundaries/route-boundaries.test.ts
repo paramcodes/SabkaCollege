@@ -9,14 +9,29 @@ import CourseOverviewLoading from "../../../app/(catalog)/courses/[courseSlug]/l
 import CourseNotFound from "../../../app/(catalog)/courses/[courseSlug]/not-found";
 import LessonError from "../../../app/(learning)/learn/[courseSlug]/[lessonSlug]/error";
 import LessonLoading from "../../../app/(learning)/learn/[courseSlug]/[lessonSlug]/loading";
-import {
-  buildBoundaryLog,
-  PageError,
-} from "../../../src/components/layout/page-error";
+import { PageError } from "../../../src/components/layout/page-error";
+import { buildBoundaryLog } from "../../../src/lib/logging/error-event";
 
+/**
+ * A boundary error carrying every leak class in its message and stack, plus a
+ * well-formed 12-character correlation digest. `sanitizeDigest` keeps only the
+ * digest, so nothing else may reach the rendered markup or the reported event.
+ */
 const secretError = Object.assign(
   new Error("select * from users failed: password_hash leak"),
-  { stack: "Error: select * from users\n    at ServerComponent", digest: "d1g3st" },
+  {
+    stack: "Error: select * from users\n    at ServerComponent",
+    digest: "d1g3st0nab12",
+  },
+);
+
+/** A boundary error whose digest is itself a credential: it must be redacted. */
+const hostileDigestError = Object.assign(
+  new Error("checkout failed for pi_3PxyzAbCdEfGhIjKlMnO"),
+  {
+    stack: "Error: checkout failed\n    at ServerComponent",
+    digest: "sk_test_51H8xkLmNoPqRsTuVwXyZ",
+  },
 );
 
 const sensitivePattern =
@@ -88,12 +103,31 @@ describe("route error boundaries", () => {
     ).toContain("<main");
   });
 
-  it("logs a structured scope and digest without the failure message", () => {
+  it("logs a structured scope and correlation digest without the failure message", () => {
     const log = buildBoundaryLog("learning.lesson", secretError);
 
-    expect(log).toEqual({ event: "route.error", scope: "learning.lesson", digest: "d1g3st" });
+    expect(log).toEqual({
+      event: "route.error",
+      scope: "learning.lesson",
+      digest: "d1g3st0nab12",
+    });
+    expect(Object.keys(log).sort()).toEqual(["digest", "event", "scope"]);
     expect(JSON.stringify(log)).not.toMatch(sensitivePattern);
+  });
+
+  it("redacts a credential-shaped digest and a missing error to null", () => {
+    expect(buildBoundaryLog("catalog.course", hostileDigestError).digest).toBeNull();
+    expect(JSON.stringify(buildBoundaryLog("catalog.course", hostileDigestError))).not.toMatch(
+      /sk_test_|pi_/,
+    );
     expect(buildBoundaryLog("student.dashboard", null).digest).toBeNull();
+    expect(buildBoundaryLog("admin.workspace", undefined).digest).toBeNull();
+  });
+
+  it("redacts a digest that is too short to be a correlation token", () => {
+    const shortDigestError = Object.assign(new Error("boom"), { digest: "d1g3st" });
+
+    expect(buildBoundaryLog("learning.course", shortDigestError).digest).toBeNull();
   });
 
   it("renders an optional eyebrow, back link, and single main landmark", () => {

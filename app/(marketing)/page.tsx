@@ -14,11 +14,13 @@ import Link from "next/link";
 
 import { HeroMotion } from "@/src/components/motion/hero-motion";
 import { Reveal } from "@/src/components/motion/reveal";
+import { RetryButton } from "@/src/components/layout/retry-button";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/src/components/ui/card";
 import { landingContent } from "@/src/lib/content/landing";
 import { formatCoursePrice } from "@/src/lib/formatting/currency";
+import { logServerError } from "@/src/lib/logging/server-error";
 
 export const metadata: Metadata = {
   title: "SabkaCollege — Learn with purpose",
@@ -53,6 +55,8 @@ async function getFeaturedCourses(): Promise<CatalogueResult> {
     };
   }
 
+  // `connection()` stays outside the try: the dynamic-boundary signal must
+  // never be swallowed into a user-facing unavailable state.
   await connection();
 
   try {
@@ -62,7 +66,8 @@ async function getFeaturedCourses(): Promise<CatalogueResult> {
 
     return { status: "courses", courses };
   } catch (error) {
-    console.error("Unable to load featured courses", error);
+    // Never pass the raw error: the structured logger emits scope and digest only.
+    logServerError("marketing.featured-courses", error);
 
     return {
       status: "unavailable",
@@ -112,9 +117,12 @@ function FeaturedCourses({ result }: { result: CatalogueResult }) {
         <div className="mt-12 border-y border-foreground/20 py-12 text-center">
           <BookOpen className="mx-auto size-7 text-primary" aria-hidden="true" />
           <p className="mt-4 text-lg font-medium">{result.message}</p>
-          <Button asChild variant="link" className="mt-3 h-auto p-0">
-            <Link href="/pricing">Read our purchasing policy</Link>
-          </Button>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+            <RetryButton />
+            <Button asChild variant="link" className="h-auto p-0">
+              <Link href="/pricing">Read our purchasing policy</Link>
+            </Button>
+          </div>
         </div>
       </Reveal>
     );

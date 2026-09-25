@@ -5,7 +5,9 @@ import { connection } from "next/server";
 import { ArrowLeft, BookOpen } from "lucide-react";
 
 import { CourseSyllabus } from "@/src/components/catalog/course-syllabus";
+import { RetryButton } from "@/src/components/layout/retry-button";
 import { Button } from "@/src/components/ui/button";
+import { logServerError } from "@/src/lib/logging/server-error";
 import { courseSlugSchema } from "@/src/lib/validation/catalog-routes";
 
 export const metadata: Metadata = {
@@ -35,6 +37,8 @@ async function getPublishedSyllabus(
     return { status: "unavailable" };
   }
 
+  // `connection()` stays outside the try: the dynamic-boundary signal must
+  // never be swallowed into a user-facing unavailable state.
   await connection();
 
   try {
@@ -51,8 +55,8 @@ async function getPublishedSyllabus(
     return course
       ? { status: "ready", course }
       : { status: "not-found" };
-  } catch {
-    console.error("Unable to load the public course syllabus");
+  } catch (error) {
+    logServerError("catalog.syllabus", error);
     return { status: "unavailable" };
   }
 }
@@ -89,9 +93,12 @@ export default async function CourseSyllabusPage({
         <p className="mx-auto mt-5 max-w-xl text-lg leading-8 text-muted-foreground">
           We could not load this syllabus safely. Please try again soon.
         </p>
-        <Button asChild variant="outline" className="mt-8">
-          <Link href={coursePath(courseSlug)}>Return to course</Link>
-        </Button>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <RetryButton />
+          <Button asChild variant="outline">
+            <Link href={coursePath(courseSlug)}>Return to course</Link>
+          </Button>
+        </div>
       </div>
     );
   }

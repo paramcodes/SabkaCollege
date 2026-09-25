@@ -4,27 +4,21 @@ import { useEffect } from "react";
 import Link from "next/link";
 
 import { Button } from "@/src/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
-
-export type BoundaryError = Error & { digest?: string };
+import { Card, CardContent, CardHeader } from "@/src/components/ui/card";
+import {
+  buildBoundaryLog,
+  type BoundaryErrorLike,
+  type ClientBoundaryScope,
+} from "@/src/lib/logging/error-event";
 
 /**
- * Builds the only error payload a route boundary is allowed to emit.
- * Messages, stacks, and request details are intentionally dropped so that a
- * failure never leaks SQL, Clerk tokens, or payment payloads into the browser.
+ * Shared safe route error boundary presentation.
+ *
+ * The component renders fixed copy only. The reported event is a structured
+ * object built by `buildBoundaryLog` (a closed scope union plus a sanitized
+ * digest), so no message, stack, SQL, Clerk value, or payment payload can reach
+ * the browser console.
  */
-export function buildBoundaryLog(
-  scope: string,
-  error: BoundaryError | null | undefined,
-): { event: "route.error"; scope: string; digest: string | null } {
-  const digest =
-    typeof error?.digest === "string" && error.digest.length > 0
-      ? error.digest
-      : null;
-
-  return { event: "route.error", scope, digest };
-}
-
 export function PageError({
   scope,
   error,
@@ -37,8 +31,8 @@ export function PageError({
   backLabel,
   contained = false,
 }: {
-  scope: string;
-  error: BoundaryError | null | undefined;
+  scope: ClientBoundaryScope;
+  error: BoundaryErrorLike;
   eyebrow?: string;
   title: string;
   description: string;
@@ -50,7 +44,7 @@ export function PageError({
   contained?: boolean;
 }) {
   useEffect(() => {
-    console.error(JSON.stringify(buildBoundaryLog(scope, error)));
+    console.error(buildBoundaryLog(scope, error));
   }, [scope, error]);
 
   const Wrapper = contained ? "div" : "main";
@@ -65,7 +59,7 @@ export function PageError({
           {eyebrow ? (
             <p className="text-sm font-medium text-primary">{eyebrow}</p>
           ) : null}
-          <CardTitle className="mt-2 font-serif text-3xl">{title}</CardTitle>
+          <h1 className="mt-2 font-serif text-3xl">{title}</h1>
         </CardHeader>
         <CardContent>
           <p className="max-w-xl leading-7 text-muted-foreground">

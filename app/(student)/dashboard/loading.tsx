@@ -2,7 +2,7 @@ import { Skeleton } from "@/src/components/ui/skeleton";
 
 export default function StudentDashboardLoading() {
   return (
-    <div className="mx-auto max-w-7xl px-5 py-14 sm:px-8 lg:px-10 lg:py-20">
+    <main className="mx-auto max-w-7xl px-5 py-14 sm:px-8 lg:px-10 lg:py-20">
       <div className="max-w-3xl">
         <Skeleton className="h-4 w-36" />
         <Skeleton className="mt-4 h-12 w-3/4 max-w-xl" />
@@ -21,6 +21,6 @@ export default function StudentDashboardLoading() {
       <p className="sr-only" role="status">
         Loading your dashboard
       </p>
-    </div>
+    </main>
   );
 }

@@ -8,7 +8,9 @@ import {
   type CatalogCourseCardData,
 } from "@/src/components/catalog/course-card";
 import { CourseFilters } from "@/src/components/catalog/course-filters";
+import { RetryButton } from "@/src/components/layout/retry-button";
 import { Button } from "@/src/components/ui/button";
+import { logServerError } from "@/src/lib/logging/server-error";
 import {
   filterCatalogCourses,
   normalizeCatalogCategory,
@@ -31,6 +33,8 @@ async function getCourseCatalog(): Promise<CourseCatalogResult> {
     return { status: "unavailable" };
   }
 
+  // `connection()` stays outside the try: the dynamic-boundary signal must
+  // never be swallowed into a user-facing unavailable state.
   await connection();
 
   try {
@@ -54,8 +58,8 @@ async function getCourseCatalog(): Promise<CourseCatalogResult> {
         ),
       })),
     };
-  } catch {
-    console.error("Unable to load the public course catalogue");
+  } catch (error) {
+    logServerError("catalog.courses", error);
     return { status: "unavailable" };
   }
 }
@@ -73,9 +77,12 @@ function CatalogueUnavailable() {
       <p className="mx-auto mt-3 max-w-xl leading-7 text-muted-foreground">
         The editorial catalogue cannot be loaded right now. Please try again soon.
       </p>
-      <Button asChild variant="outline" className="mt-7">
-        <Link href="/">Return home</Link>
-      </Button>
+      <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+        <RetryButton />
+        <Button asChild variant="outline">
+          <Link href="/">Return home</Link>
+        </Button>
+      </div>
     </div>
   );
 }

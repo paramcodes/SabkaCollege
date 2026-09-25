@@ -5,8 +5,10 @@ import { connection } from "next/server";
 import { ArrowRight, BookOpen, Clock3, GraduationCap, Play } from "lucide-react";
 
 import { PurchaseCard } from "@/src/components/catalog/purchase-card";
+import { RetryButton } from "@/src/components/layout/retry-button";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
+import { logServerError } from "@/src/lib/logging/server-error";
 import { courseSlugSchema } from "@/src/lib/validation/catalog-routes";
 
 export const metadata: Metadata = {
@@ -34,6 +36,8 @@ async function getPublishedCourse(courseSlug: string): Promise<CourseResult> {
     return { status: "unavailable" };
   }
 
+  // `connection()` stays outside the try: the dynamic-boundary signal must
+  // never be swallowed into a user-facing unavailable state.
   await connection();
 
   try {
@@ -43,8 +47,8 @@ async function getPublishedCourse(courseSlug: string): Promise<CourseResult> {
     const course = await getPublishedCourseBySlug(courseSlug);
 
     return course ? { status: "ready", course } : { status: "not-found" };
-  } catch {
-    console.error("Unable to load the public course overview");
+  } catch (error) {
+    logServerError("catalog.course", error);
     return { status: "unavailable" };
   }
 }
@@ -82,9 +86,12 @@ export default async function CourseOverviewPage({
           We could not load this course safely. Please try again soon or return to
           the catalogue.
         </p>
-        <Button asChild variant="outline" className="mt-8">
-          <Link href="/courses">Return to courses</Link>
-        </Button>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <RetryButton />
+          <Button asChild variant="outline">
+            <Link href="/courses">Return to courses</Link>
+          </Button>
+        </div>
       </div>
     );
   }
@@ -110,8 +117,8 @@ export default async function CourseOverviewPage({
     try {
       const { hasCourseAccess } = await import("@/src/lib/billing/entitlements");
       hasAccess = await hasCourseAccess(userId, course.id);
-    } catch {
-      console.error("Unable to confirm the public course purchase state");
+    } catch (error) {
+      logServerError("catalog.course.access", error);
       hasAccess = false;
     }
   }
