@@ -6,7 +6,7 @@
 
 **Architecture:** Build one Next.js App Router application as a modular monolith. Drizzle owns LMS content and progress data in Neon; Clerk owns sessions, user metadata, and billing. Public pages read published content, student routes require an active paid purchase, and admin server actions require the Clerk admin role. Keep feature code separated into catalog, learning, billing, student, and admin modules.
 
-**Tech Stack:** Bun, Next.js App Router, TypeScript, React, Tailwind CSS, shadcn/ui, Clerk, Clerk Billing, Drizzle ORM, Neon PostgreSQL, Zod, GSAP, Vitest, Playwright.
+**Tech Stack:** Bun, Next.js App Router, TypeScript, React, Tailwind CSS, shadcn/ui, Clerk, Stripe Checkout, Drizzle ORM, Neon PostgreSQL, Zod, GSAP, Vitest, Playwright.
 
 **Spec:** `docs/superpowers/specs/2026-09-25-sabkacollege-lms-design.md`
 
@@ -14,7 +14,7 @@
 
 - Use Bun for package installation, scripts, and commands.
 - Use Next.js App Router and TypeScript.
-- Use Clerk for authentication, sessions, public role metadata, and billing.
+- Use Clerk for authentication, sessions, and public role metadata. Use Stripe Checkout for one-time course payments, signed Stripe webhooks, refunds, and payment status.
 - Use Drizzle ORM with Neon PostgreSQL for application data.
 - Use shadcn/ui primitives for accessible base controls.
 - Use GSAP only for purposeful motion; respect `prefers-reduced-motion`.
@@ -22,7 +22,7 @@
 - Require authentication before purchase; keep catalog, course overviews, and syllabi public.
 - Mark a lesson automatically complete at 90% watched; also allow manual completion.
 - Only admins may create, edit, publish, archive, or reorder course content.
-- Verify Clerk webhook signatures and make webhook processing idempotent.
+- Verify Clerk user-webhook signatures and Stripe webhook signatures; make both webhook processors idempotent.
 - Do not expose unpublished courses, lesson video references, or admin controls publicly.
 - Keep billing secrets, Clerk secrets, and database credentials server-only.
 - Do not add cohorts, subscriptions, certificates, forums, chat, instructor revenue splits, or direct video uploads in this MVP.
@@ -57,7 +57,7 @@ src/
 ├── db/queries/                           # read queries
 ├── db/seed/                              # deterministic development seed
 ├── lib/auth/                             # Clerk session/role helpers
-├── lib/billing/                          # Clerk Billing adapter and webhooks
+├── lib/billing/                          # Stripe Checkout adapter and webhooks
 ├── lib/validation/                       # Zod schemas
 ├── lib/utils/                            # pure progress, ordering, formatting
 └── styles/                               # design tokens and global styles
@@ -273,7 +273,7 @@ Do not add real credentials or commit `.env` files.
 
 - [ ] **Step 2: Define schema constraints**
 
-Define UUID primary keys, timestamps, indexes on `courseId`, `moduleId`, `userId`, and `courseSlug`, and the unique constraints `purchases.clerkPurchaseId` and `lessonProgress(userId, lessonId)`. Use numeric integer cents for money and integer seconds for playback positions.
+Define UUID primary keys, timestamps, indexes on `courseId`, `moduleId`, `userId`, and `courseSlug`, and the unique constraints `purchases.stripePaymentIntentId` and `lessonProgress(userId, lessonId)`. Use numeric integer cents for money and integer seconds for playback positions.
 
 - [ ] **Step 3: Define relations and status unions**
 
@@ -458,51 +458,66 @@ git commit -m "feat: add course queries and progress rules"
 
 ---
 
-### Task 6: Add Clerk Billing, Webhook Purchases, and Entitlements
+### Task 6: Add Stripe Checkout, Webhook Purchases, and Entitlements
 
 **Files:**
+- Modify: `src/db/schema/courses.ts`
+- Modify: `src/db/schema/purchases.ts`
+- Modify: `src/db/schema/index.ts`
+- Modify: `tests/unit/db/schema-contract.test.ts`
+- Create: `drizzle/0002_stripe_purchase_contract.sql` (generated name may vary)
 - Create: `src/lib/billing/checkout.ts`
 - Create: `src/lib/billing/webhooks.ts`
 - Create: `src/lib/billing/entitlements.ts`
 - Create: `src/actions/billing.ts`
+- Create: `app/api/webhooks/stripe/route.ts`
 - Create: `tests/unit/billing/entitlements.test.ts`
 - Create: `tests/unit/billing/webhook-idempotency.test.ts`
+- Modify: `.env.example`
+- Modify: `package.json`
+- Modify: `bun.lock`
 
 **Interfaces:**
-- Produces: `createCourseCheckout({ courseId, userId }): Promise<{ checkoutUrl: string }>`.
+- Produces: `createCourseCheckout({ courseSlug, userId }): Promise<{ checkoutUrl: string }>`.
 - Produces: `hasCourseAccess(userId: string, courseId: string): Promise<boolean>`.
-- Produces: `handleClerkBillingEvent(event: VerifiedBillingEvent): Promise<void>`.
-- Consumes: Clerk Billing API and `purchases` from Task 3.
+- Produces: `handleStripeEvent(event: VerifiedStripeEvent): Promise<void>`.
+- Consumes: Stripe Checkout API and the `purchases` table from Task 3.
 
 - [ ] **Step 1: Write entitlement and idempotency tests**
 
-Test the pure entitlement decision for `pending`, `paid`, `refunded`, and `revoked` purchases, then test that processing the same verified event twice still leaves one purchase.
+Test the pure entitlement decision for `pending`, `paid`, `refunded`, and `revoked` purchases, then test that processing the same verified Stripe event twice still leaves one purchase. Tests must not require live Stripe credentials.
 
-- [ ] **Step 2: Implement the Billing adapter**
+- [ ] **Step 2: Update the purchase schema and environment contract**
 
-Use the current official Clerk Billing integration for one-time product/price checkout. The server action must require `requireUser()`, load the published course and its configured Clerk price, and never accept an unchecked client-supplied amount.
+Replace Clerk product/price and purchase identifiers with `stripeProductId`, `stripePriceId`, `stripeCheckoutSessionId`, and `stripePaymentIntentId`. Keep the unique payment-intent constraint. Add `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `NEXT_PUBLIC_APP_URL` to `.env.example`; update the schema contract test and regenerate the Drizzle migration.
 
-- [ ] **Step 3: Implement verified webhook processing**
+- [ ] **Step 3: Implement the Stripe Checkout adapter**
 
-Verify the raw body and signature, map the Billing event to `pending`, `paid`, `refunded`, or `revoked`, and upsert by `clerkPurchaseId`. Store the Clerk user ID and course ID only after validating the referenced records.
+Use the current official Stripe Node SDK. The server action must require `requireUser()`, load the published course and configured Stripe Price from the database, create a Checkout Session with the server-derived Clerk user email and course metadata, and return the hosted `checkoutUrl`. Never accept a client-supplied amount, Stripe Price ID, or user ID as authority.
 
-- [ ] **Step 4: Implement access checks**
+- [ ] **Step 4: Implement verified Stripe webhook processing**
+
+Verify the raw body with `STRIPE_WEBHOOK_SECRET` before parsing. Map checkout/payment/refund/dispute lifecycle events to `pending`, `paid`, `refunded`, or `revoked`; upsert by `stripePaymentIntentId`; preserve the Clerk user and course mapping in metadata; and make repeated delivery converge on one purchase. Do not log raw payloads or secrets.
+
+- [ ] **Step 5: Implement access checks**
 
 `hasCourseAccess` returns true only for a matching `paid` purchase. Students with a refunded or revoked purchase lose learning access. Public course pages do not call this function.
 
-- [ ] **Step 5: Run tests and typecheck**
+- [ ] **Step 6: Run tests and quality checks**
 
 ```bash
-bun test tests/unit/billing
+bun run db:generate
+bun test tests/unit/billing tests/unit/db
 bun run typecheck
 bun run lint
+bun run build
 ```
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add src/lib/billing src/actions/billing.ts tests/unit/billing
-git commit -m "feat: add Clerk Billing purchases and entitlements"
+git add src/db/schema drizzle src/lib/billing src/actions/billing.ts app/api/webhooks/stripe tests/unit/billing tests/unit/db .env.example package.json bun.lock
+git commit -m "feat: add Stripe purchases and entitlements"
 ```
 
 ---
@@ -916,7 +931,7 @@ README must include Bun installation, `.env` setup, Clerk app configuration, Neo
 
 - [ ] **Step 2: Add release checklist**
 
-The checklist must cover Clerk production origins, Clerk Billing webhook URL and signing secret, Neon production database, migrations, seed policy, Playwright smoke tests, reduced-motion behavior, and screenshot regeneration.
+The checklist must cover Clerk production origins, Stripe webhook URL and signing secret, Neon production database, migrations, seed policy, Playwright smoke tests, reduced-motion behavior, and screenshot regeneration.
 
 - [ ] **Step 3: Run the complete quality gate**
 
@@ -962,7 +977,7 @@ git commit -m "chore: finalize SabkaCollege release documentation"
 - Admin dashboard, courses, students, purchases: Task 9
 - Only admins add courses: Task 4 guards plus Task 9 actions
 - Clerk authentication: Task 4
-- Clerk Billing and one-time purchases: Task 6
+- Stripe Checkout and one-time purchases: Task 6
 - Drizzle and Neon: Task 3
 - shadcn/ui: Task 2
 - GSAP and reduced motion: Tasks 2 and 7
