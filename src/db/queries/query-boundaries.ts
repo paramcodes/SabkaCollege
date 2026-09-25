@@ -1,12 +1,9 @@
-import { and, asc, eq, type SQL } from "drizzle-orm";
+import { and, asc, eq, sql, type SQL } from "drizzle-orm";
 
 import { userIdSchema } from "../../lib/validation/progress";
-import {
-  courses,
-  lessonProgress,
-  lessons,
-  modules,
-} from "../schema";
+import { courses, lessons, modules } from "../schema/courses";
+import { lessonProgress } from "../schema/lesson-progress";
+import { purchases } from "../schema/purchases";
 
 export const publicCourseColumns = {
   id: true,
@@ -65,6 +62,39 @@ export const previewLessonPublicColumns = {
   courseSlug: courses.slug,
   courseTitle: courses.title,
 } as const;
+
+export const studentDashboardCourseColumns = {
+  slug: true,
+  title: true,
+  shortDescription: true,
+  coverImageUrl: true,
+  estimatedDurationMinutes: true,
+} as const;
+
+export const studentDashboardProgressColumns = {
+  lessonId: lessonProgress.lessonId,
+  completedAt: lessonProgress.completedAt,
+  updatedAt: lessonProgress.updatedAt,
+} as const;
+
+export const studentDashboardCourseWhere = (userId: string): SQL => {
+  const parsedUserId = userIdSchema.safeParse(userId);
+
+  if (!parsedUserId.success) {
+    throw new Error("A server-derived user ID is required.");
+  }
+
+  return and(
+    eq(courses.status, "published"),
+    sql`exists (
+      select 1
+      from ${purchases}
+      where ${purchases.userId} = ${parsedUserId.data}
+        and ${purchases.courseId} = ${courses.id}
+        and ${purchases.status} = ${"paid"}
+    )`,
+  ) as SQL;
+};
 
 export const publishedCourseWithSyllabus = () => ({
   columns: publicCourseColumns,
