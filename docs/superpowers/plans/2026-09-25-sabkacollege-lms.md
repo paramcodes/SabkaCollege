@@ -388,6 +388,7 @@ git commit -m "feat: add Clerk auth and admin guards"
 ### Task 5: Add Validation, Course Queries, and Cache Tags
 
 **Files:**
+- Modify: `next.config.ts`
 - Create: `src/lib/validation/course.ts`
 - Create: `src/lib/validation/lesson.ts`
 - Create: `src/lib/validation/progress.ts`
@@ -401,7 +402,7 @@ git commit -m "feat: add Clerk auth and admin guards"
 
 **Interfaces:**
 - Produces: `getPublishedCourses()`, `getPublishedCourseBySlug(slug)`, and `getCourseSyllabus(courseId)`.
-- Produces: `getPublicPreviewLesson(courseSlug, lessonId)` that returns video data only when the lesson belongs to a published course and `isPreview` is true.
+- Produces: `getPublicPreviewLesson(courseSlug, lessonSlug)` that returns video data only when the lesson belongs to a published course and `isPreview` is true.
 - Produces: `calculateCourseProgress(totalLessons, completedLessons): number`.
 - Produces: `shouldAutoComplete(maxWatchedPercentage): boolean`.
 - Produces: `normalizePositions<T extends { position: number }>(items: T[]): T[]`.
@@ -435,7 +436,7 @@ Define schemas for course fields, module ordering, lesson fields, external video
 
 - [ ] **Step 3: Implement read queries with public-only filters**
 
-Query only `status = 'published'` from public query functions. Return nested courses with ordered modules and lessons. Do not select `videoReference` for non-preview lessons in public payloads.
+Enable the installed Next.js cache-components flag in `next.config.ts` before using `cacheTag()`. Query only `status = 'published'` from public query functions. Return nested courses with ordered modules and lessons. Do not select `videoReference` for non-preview lessons in public payloads. Public preview lookup uses the route's `courseSlug` and `lessonSlug`, requires a published course, and requires `isPreview = true`.
 
 - [ ] **Step 4: Implement pure progress and ordering helpers**
 
