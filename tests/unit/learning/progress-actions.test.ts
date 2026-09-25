@@ -133,6 +133,35 @@ describe("progress actions", () => {
     );
   });
 
+  it("does not auto-complete a zero-duration lesson from existing high progress", async () => {
+    const { dependencies, actions } = makeDependencies({
+      findLesson: vi.fn(async () => ({ ...lesson, durationSeconds: 0 })),
+      getProgress: vi.fn(async () => ({
+        lastPositionSeconds: 0,
+        maxWatchedPercentage: 0.95,
+        completedAt: null,
+        completionMethod: null,
+      })),
+    });
+    const result = await actions.saveLessonProgress({
+      courseSlug: "course-one",
+      lessonSlug: "lesson-one",
+      lastPositionSeconds: 0,
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      data: { completed: false, courseProgress: 50 },
+    });
+    expect(dependencies.upsertProgress).toHaveBeenCalledWith(
+      expect.objectContaining({
+        maxWatchedPercentage: 0.95,
+        completedAt: null,
+        completionMethod: null,
+      }),
+    );
+  });
+
   it("records manual completion without trusting a client completion flag", async () => {
     const { dependencies, actions } = makeDependencies();
     const result = await actions.markLessonComplete({

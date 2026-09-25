@@ -118,7 +118,7 @@ export function createProgressActions(dependencies: ProgressDependencies) {
         existing?.maxWatchedPercentage ?? 0,
         derivedProgress.maxWatchedPercentage,
       );
-      const autoComplete = shouldAutoComplete(nextMax);
+      const autoComplete = lesson.durationSeconds > 0 && shouldAutoComplete(nextMax);
       const completedAt = existing?.completedAt ?? (autoComplete ? new Date() : null);
       const completionMethod =
         existing?.completionMethod ?? (autoComplete ? "automatic" : null);
