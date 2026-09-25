@@ -12,12 +12,8 @@ import {
 
 const seedTimestamp = new Date("2026-01-01T00:00:00.000Z");
 
-/**
- * Preview lessons point at a repo-relative demo asset path. It is deliberately
- * not a real third-party URL and contains no secret, so the public preview
- * route stays structurally usable and the seed depends on no external host.
- */
-const demoPreviewReference = (slug: string) => `/demo/preview/${slug}.mp4`;
+/** Official public YouTube iframe API demo video used by deterministic fixtures. */
+const previewVideoReference = "M7lc1UVf-VE";
 
 export const seedCourses = [
   {
@@ -135,8 +131,8 @@ export const seedLessons = [
     title: "India in 1947: A New Beginning",
     description: "The conditions surrounding independence and the new nation.",
     position: 0,
-    videoProvider: "external",
-    videoReference: demoPreviewReference("india-in-1947"),
+    videoProvider: "youtube",
+    videoReference: previewVideoReference,
     durationSeconds: 720,
     isPreview: true,
     createdAt: seedTimestamp,
@@ -163,8 +159,8 @@ export const seedLessons = [
     title: "Citizenship and Participation",
     description: "How participation sustains democratic institutions.",
     position: 0,
-    videoProvider: "external",
-    videoReference: demoPreviewReference("citizenship-and-participation"),
+    videoProvider: "youtube",
+    videoReference: previewVideoReference,
     durationSeconds: 660,
     isPreview: true,
     createdAt: seedTimestamp,
@@ -177,8 +173,8 @@ export const seedLessons = [
     title: "Digital Safety Essentials",
     description: "Protect accounts, privacy, and personal information.",
     position: 0,
-    videoProvider: "external",
-    videoReference: demoPreviewReference("digital-safety-essentials"),
+    videoProvider: "youtube",
+    videoReference: previewVideoReference,
     durationSeconds: 600,
     isPreview: true,
     createdAt: seedTimestamp,

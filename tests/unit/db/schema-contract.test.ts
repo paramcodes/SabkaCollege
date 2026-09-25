@@ -7,6 +7,7 @@ import {
 import { getTableConfig, type PgTable } from "drizzle-orm/pg-core";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
+import { seedLessons } from "../../../src/db/seed/data";
 import {
   completionMethod,
   courseStatus,
@@ -190,6 +191,23 @@ describe("database schema contract", () => {
     expect(column(lessons, "duration_seconds").default).toBe(0);
     expect(column(lessons, "is_preview").getSQLType()).toBe("boolean");
     expect(column(lessons, "is_preview").default).toBe(false);
+  });
+
+  it("seeds playable provider references for every public preview", () => {
+    const previewLessons = seedLessons.filter((lesson) => lesson.isPreview);
+
+    expect(previewLessons).toHaveLength(3);
+    expect(
+      previewLessons.map(({ videoProvider, videoReference }) => ({
+        videoProvider,
+        videoReference,
+      })),
+    ).toEqual(
+      Array.from({ length: previewLessons.length }, () => ({
+        videoProvider: "youtube",
+        videoReference: "M7lc1UVf-VE",
+      })),
+    );
   });
 
   it("defines purchase and lesson-progress persistence fields", () => {
