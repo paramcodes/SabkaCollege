@@ -7,6 +7,7 @@ import { ArrowRight, BookOpen, Clock3, GraduationCap, Play } from "lucide-react"
 import { PurchaseCard } from "@/src/components/catalog/purchase-card";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
+import { courseSlugSchema } from "@/src/lib/validation/catalog-routes";
 
 export const metadata: Metadata = {
   title: "Course overview — SabkaCollege",
@@ -56,7 +57,14 @@ export default async function CourseOverviewPage({
 }: {
   params: Promise<{ courseSlug: string }>;
 }) {
-  const { courseSlug } = await params;
+  const paramsResult = await params;
+  const courseSlugResult = courseSlugSchema.safeParse(paramsResult.courseSlug);
+
+  if (!courseSlugResult.success) {
+    notFound();
+  }
+
+  const courseSlug = courseSlugResult.data;
   const result = await getPublishedCourse(courseSlug);
 
   if (result.status === "not-found") {

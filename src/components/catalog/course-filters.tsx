@@ -16,6 +16,7 @@ import {
 } from "@/src/components/ui/select";
 import {
   MAX_CATALOG_SEARCH_LENGTH,
+  normalizeCatalogCategory,
   normalizeCatalogSearch,
 } from "@/src/lib/validation/catalog-search";
 
@@ -26,7 +27,10 @@ export function CourseFilters({ categories }: { categories: string[] }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const initialSearch = searchParams.get("q") ?? "";
-  const initialCategory = searchParams.get("category") ?? ALL_CATEGORIES;
+  const normalizedInitialCategory = normalizeCatalogCategory(
+    searchParams.get("category"),
+  );
+  const initialCategory = normalizedInitialCategory || ALL_CATEGORIES;
   const [search, setSearch] = useState(initialSearch);
   const [error, setError] = useState<string | null>(null);
 
@@ -94,7 +98,15 @@ export function CourseFilters({ categories }: { categories: string[] }) {
         <Select
           value={initialCategory}
           onValueChange={(value) => {
-            updateUrl(normalizeCatalogSearch(search) ?? "", value);
+            const normalizedSearch = normalizeCatalogSearch(search);
+
+            if (normalizedSearch === null) {
+              setError(`Use ${MAX_CATALOG_SEARCH_LENGTH} characters or fewer.`);
+              return;
+            }
+
+            setError(null);
+            updateUrl(normalizedSearch, normalizeCatalogCategory(value) ?? ALL_CATEGORIES);
           }}
         >
           <SelectTrigger id="catalog-category" className="h-11 w-full">

@@ -1,64 +1,7 @@
-const youtubeReferencePattern = /^[A-Za-z0-9_-]{6,20}$/;
-const vimeoReferencePattern = /^\d{6,12}$/;
-const muxReferencePattern = /^[A-Za-z0-9_-]{8,128}$/;
-
-type PublicVideoProvider =
-  | "youtube"
-  | "vimeo"
-  | "mux"
-  | "cloudflare_stream"
-  | "external";
-
-type PublicEmbed = {
-  kind: "iframe" | "video";
-  src: string;
-};
-
-const getPublicEmbed = (
-  provider: PublicVideoProvider,
-  reference: string | null,
-): PublicEmbed | null => {
-  if (!reference) {
-    return null;
-  }
-
-  if (provider === "youtube" && youtubeReferencePattern.test(reference)) {
-    return {
-      kind: "iframe",
-      src: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(reference)}`,
-    };
-  }
-
-  if (provider === "vimeo" && vimeoReferencePattern.test(reference)) {
-    return {
-      kind: "iframe",
-      src: `https://player.vimeo.com/video/${encodeURIComponent(reference)}`,
-    };
-  }
-
-  if (provider === "mux" && muxReferencePattern.test(reference)) {
-    return {
-      kind: "video",
-      src: `https://stream.mux.com/${encodeURIComponent(reference)}/public-video`,
-    };
-  }
-
-  if (provider === "cloudflare_stream") {
-    try {
-      const url = new URL(reference);
-      const trustedHost = url.hostname.endsWith(".cloudflarestream.com");
-      const hasAssetPath = /^\/[A-Za-z0-9_-]{8,128}\/?$/.test(url.pathname);
-
-      if (url.protocol === "https:" && trustedHost && hasAssetPath) {
-        return { kind: "iframe", src: url.toString() };
-      }
-    } catch {
-      return null;
-    }
-  }
-
-  return null;
-};
+import {
+  getPublicEmbed,
+  type PublicVideoProvider,
+} from "@/src/lib/validation/public-preview";
 
 export function PublicPreviewPlayer({
   title,
@@ -105,8 +48,8 @@ export function PublicPreviewPlayer({
       title={`${title} course preview`}
       allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture; web-share"
       allowFullScreen
-      referrerPolicy="strict-origin-when-cross-origin"
-      sandbox="allow-scripts allow-same-origin allow-presentation"
+      referrerPolicy={embed.referrerPolicy}
+      sandbox={embed.sandbox}
     />
   );
 }

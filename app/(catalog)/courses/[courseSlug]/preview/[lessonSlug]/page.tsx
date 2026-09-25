@@ -6,6 +6,10 @@ import { ArrowLeft, BookOpen, Clock3 } from "lucide-react";
 
 import { PublicPreviewPlayer } from "@/src/components/catalog/public-preview-player";
 import { Button } from "@/src/components/ui/button";
+import {
+  courseSlugSchema,
+  lessonSlugSchema,
+} from "@/src/lib/validation/catalog-routes";
 
 export const metadata: Metadata = {
   title: "Public lesson preview — SabkaCollege",
@@ -59,7 +63,16 @@ export default async function PublicPreviewPage({
 }: {
   params: Promise<{ courseSlug: string; lessonSlug: string }>;
 }) {
-  const { courseSlug, lessonSlug } = await params;
+  const paramsResult = await params;
+  const courseSlugResult = courseSlugSchema.safeParse(paramsResult.courseSlug);
+  const lessonSlugResult = lessonSlugSchema.safeParse(paramsResult.lessonSlug);
+
+  if (!courseSlugResult.success || !lessonSlugResult.success) {
+    notFound();
+  }
+
+  const courseSlug = courseSlugResult.data;
+  const lessonSlug = lessonSlugResult.data;
   const result = await getPublicPreview(courseSlug, lessonSlug);
 
   if (result.status === "not-found") {

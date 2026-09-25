@@ -93,6 +93,7 @@ export function CourseSyllabus({
                       <span className="inline-flex items-center gap-2 text-muted-foreground">
                         <LockKeyhole className="size-3.5" aria-hidden="true" />
                         {lesson.title}
+                        <span className="sr-only">Locked</span>
                       </span>
                     )}
                   </h3>

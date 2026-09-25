@@ -8,21 +8,10 @@ import { startCourseCheckout } from "@/src/actions/billing";
 import { Button } from "@/src/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
 import { formatCoursePrice } from "@/src/lib/formatting/currency";
+import { isAllowedStripeRedirectUrl } from "@/src/lib/validation/stripe-redirect";
 
 const coursePath = (courseSlug: string) =>
   `/courses/${encodeURIComponent(courseSlug)}`;
-
-const isStripeCheckoutUrl = (value: string) => {
-  try {
-    const url = new URL(value);
-    return (
-      url.protocol === "https:" &&
-      (url.hostname === "stripe.com" || url.hostname.endsWith(".stripe.com"))
-    );
-  } catch {
-    return false;
-  }
-};
 
 export function PurchaseCard({
   courseSlug,
@@ -51,7 +40,7 @@ export function PurchaseCard({
             This course is ready in your learning area.
           </p>
           <Button asChild size="lg" className="mt-6 w-full">
-            <Link href={`/dashboard/courses/${encodeURIComponent(courseSlug)}`}>
+            <Link href={`/learn/${encodeURIComponent(courseSlug)}`}>
               Continue learning <ArrowRight aria-hidden="true" />
             </Link>
           </Button>
@@ -96,7 +85,7 @@ export function PurchaseCard({
         return;
       }
 
-      if (!isStripeCheckoutUrl(result.data.checkoutUrl)) {
+      if (!isAllowedStripeRedirectUrl(result.data.checkoutUrl)) {
         setError("Checkout is temporarily unavailable. Please try again.");
         return;
       }

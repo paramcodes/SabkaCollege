@@ -161,10 +161,15 @@ export default async function CoursesPage({
       ) : null}
 
       {visibleCourses.length > 0 ? (
-        <section aria-label="Published courses" className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {visibleCourses.map((course) => (
-            <CourseCard key={course.slug} course={course} />
-          ))}
+        <section aria-labelledby="published-courses" className="mt-10">
+          <h2 id="published-courses" className="sr-only">
+            Published courses
+          </h2>
+          <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {visibleCourses.map((course) => (
+              <CourseCard key={course.slug} course={course} />
+            ))}
+          </div>
         </section>
       ) : null}
     </div>

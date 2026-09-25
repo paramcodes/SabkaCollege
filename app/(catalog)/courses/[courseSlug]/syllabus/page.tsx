@@ -6,6 +6,7 @@ import { ArrowLeft, BookOpen } from "lucide-react";
 
 import { CourseSyllabus } from "@/src/components/catalog/course-syllabus";
 import { Button } from "@/src/components/ui/button";
+import { courseSlugSchema } from "@/src/lib/validation/catalog-routes";
 
 export const metadata: Metadata = {
   title: "Course syllabus — SabkaCollege",
@@ -64,7 +65,14 @@ export default async function CourseSyllabusPage({
 }: {
   params: Promise<{ courseSlug: string }>;
 }) {
-  const { courseSlug } = await params;
+  const paramsResult = await params;
+  const courseSlugResult = courseSlugSchema.safeParse(paramsResult.courseSlug);
+
+  if (!courseSlugResult.success) {
+    notFound();
+  }
+
+  const courseSlug = courseSlugResult.data;
   const result = await getPublishedSyllabus(courseSlug);
 
   if (result.status === "not-found") {
