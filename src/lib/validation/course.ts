@@ -15,13 +15,13 @@ export const courseInputSchema = z
     status: courseStatusSchema,
     priceAmount: z.number().int().nonnegative(),
     currency: nonEmptyText,
-    clerkProductId: optionalText,
-    clerkPriceId: optionalText,
+    stripeProductId: optionalText,
+    stripePriceId: optionalText,
     estimatedDurationMinutes: z.number().int().nonnegative(),
     purchasable: z.boolean().optional(),
   })
   .superRefine((course, context) => {
-    if ((course.purchasable === true || course.clerkPriceId) && course.priceAmount <= 0) {
+    if ((course.purchasable === true || course.stripePriceId) && course.priceAmount <= 0) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["priceAmount"],

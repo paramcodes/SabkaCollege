@@ -22,7 +22,20 @@ export type BillingActionResult =
 export async function startCourseCheckout(input: {
   courseSlug: string;
 }): Promise<BillingActionResult> {
-  const user = await requireUser();
+  let user;
+
+  try {
+    user = await requireUser();
+  } catch {
+    return {
+      ok: false,
+      error: {
+        code: "UNAUTHENTICATED",
+        message: "Sign in to purchase this course.",
+      },
+    };
+  }
+
   const parsedInput = checkoutInput.safeParse(input);
 
   if (!parsedInput.success) {

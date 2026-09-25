@@ -13,7 +13,11 @@ export const nextPurchaseStatus = (
     return "revoked";
   }
 
-  if (current === "refunded" && incoming === "paid") {
+  if (incoming === "revoked") {
+    return "revoked";
+  }
+
+  if (current === "refunded") {
     return "refunded";
   }
 

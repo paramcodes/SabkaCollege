@@ -14,6 +14,8 @@ export type VerifiedStripeEvent = {
   amount: number | null;
   currency: string | null;
   status: PurchaseStatus;
+  stripeEventType: string;
+  disputeWon: boolean;
   purchasedAt: Date;
 };
 
@@ -59,10 +61,15 @@ const withRequiredMetadata = (
   event: VerifiedStripeEvent,
   requireAmount: boolean,
 ): VerifiedStripeEvent | null => {
-  const hasRequiredIdentity = Boolean(event.userId && event.courseId);
+  const hasRequiredIdentity = Boolean(
+    event.userId && event.courseId && event.stripePriceId,
+  );
   const hasRequiredAmount = !requireAmount || event.amount !== null;
+  const hasRequiredCurrency = !requireAmount || Boolean(event.currency);
 
-  return hasRequiredIdentity && hasRequiredAmount ? event : null;
+  return hasRequiredIdentity && hasRequiredAmount && hasRequiredCurrency
+    ? event
+    : null;
 };
 
 export const mapStripeEventToPurchase = (
@@ -75,11 +82,20 @@ export const mapStripeEventToPurchase = (
   let amount: number | null = null;
   let currency: string | null = null;
   let status: PurchaseStatus | null = null;
-  let requireMetadata = false;
   let requireAmount = false;
+  let disputeWon = false;
 
   switch (event.type as string) {
-    case "checkout.session.completed":
+    case "checkout.session.completed": {
+      const session = object as Stripe.Checkout.Session;
+      paymentIntentId = getId(session.payment_intent);
+      checkoutSessionId = session.id;
+      amount = session.amount_total;
+      currency = session.currency;
+      status = session.payment_status === "paid" ? "paid" : "pending";
+      requireAmount = true;
+      break;
+    }
     case "checkout.session.async_payment_succeeded": {
       const session = object as Stripe.Checkout.Session;
       paymentIntentId = getId(session.payment_intent);
@@ -87,7 +103,6 @@ export const mapStripeEventToPurchase = (
       amount = session.amount_total;
       currency = session.currency;
       status = "paid";
-      requireMetadata = true;
       requireAmount = true;
       break;
     }
@@ -98,7 +113,6 @@ export const mapStripeEventToPurchase = (
       amount = session.amount_total;
       currency = session.currency;
       status = "pending";
-      requireMetadata = true;
       requireAmount = true;
       break;
     }
@@ -108,7 +122,6 @@ export const mapStripeEventToPurchase = (
       amount = paymentIntent.amount;
       currency = paymentIntent.currency;
       status = "paid";
-      requireMetadata = true;
       break;
     }
     case "payment_intent.payment_failed": {
@@ -117,7 +130,6 @@ export const mapStripeEventToPurchase = (
       amount = paymentIntent.amount;
       currency = paymentIntent.currency;
       status = "pending";
-      requireMetadata = true;
       break;
     }
     case "charge.refunded": {
@@ -145,7 +157,9 @@ export const mapStripeEventToPurchase = (
     case "dispute.closed": {
       const dispute = object as Stripe.Dispute;
       paymentIntentId = getId(dispute.payment_intent);
-      status = "revoked";
+      disputeWon =
+        (event.type as string).endsWith(".closed") && dispute.status === "won";
+      status = disputeWon ? "paid" : "revoked";
       break;
     }
     default:
@@ -167,13 +181,44 @@ export const mapStripeEventToPurchase = (
     amount,
     currency,
     status,
+    stripeEventType: event.type as string,
+    disputeWon,
     purchasedAt: occurredAt,
   };
 
-  return requireMetadata
+  const requiresIdentity = event.type === "checkout.session.completed" ||
+    event.type === "checkout.session.async_payment_succeeded" ||
+    event.type === "checkout.session.async_payment_failed" ||
+    event.type === "payment_intent.succeeded" ||
+    event.type === "payment_intent.payment_failed";
+
+  return requiresIdentity
     ? withRequiredMetadata(verifiedEvent, requireAmount)
     : verifiedEvent;
 };
+
+const isRefundEvent = (stripeEventType: string): boolean =>
+  stripeEventType === "charge.refunded" ||
+  stripeEventType === "refund.created" ||
+  stripeEventType === "refund.updated";
+
+const hasConflictingExistingMetadata = (
+  existing: PurchaseRecord,
+  event: VerifiedStripeEvent,
+): boolean =>
+  (event.userId !== null && event.userId !== existing.userId) ||
+  (event.courseId !== null && event.courseId !== existing.courseId) ||
+  (event.stripeProductId !== null &&
+    event.stripeProductId !== existing.stripeProductId) ||
+  (event.stripePriceId !== null &&
+    event.stripePriceId !== existing.stripePriceId) ||
+  (event.stripeCheckoutSessionId !== null &&
+    event.stripeCheckoutSessionId !== existing.stripeCheckoutSessionId) ||
+  (event.amount !== null &&
+    !isRefundEvent(event.stripeEventType) &&
+    event.amount !== existing.amount) ||
+  (event.currency !== null &&
+    event.currency.toUpperCase() !== existing.currency.toUpperCase());
 
 export const convergePurchaseRecords = (
   records: PurchaseRecord[],
@@ -181,8 +226,7 @@ export const convergePurchaseRecords = (
   incoming: PurchaseRecord,
 ): PurchaseRecord[] => {
   const existingIndex = records.findIndex(
-    (record) =>
-      record.stripePaymentIntentId === event.stripePaymentIntentId,
+    (record) => record.stripePaymentIntentId === event.stripePaymentIntentId,
   );
 
   if (existingIndex === -1) {
@@ -194,18 +238,13 @@ export const convergePurchaseRecords = (
     return records;
   }
 
+  if (hasConflictingExistingMetadata(existing, event)) {
+    throw new Error("Stripe event conflicts with existing purchase");
+  }
+
   const converged: PurchaseRecord = {
     ...existing,
-    stripeCheckoutSessionId:
-      incoming.stripeCheckoutSessionId ?? existing.stripeCheckoutSessionId,
-    userId: incoming.userId ?? existing.userId,
-    courseId: incoming.courseId ?? existing.courseId,
-    stripeProductId: incoming.stripeProductId ?? existing.stripeProductId,
-    stripePriceId: incoming.stripePriceId ?? existing.stripePriceId,
-    amount: incoming.amount ?? existing.amount,
-    currency: incoming.currency ?? existing.currency,
     status: nextPurchaseStatus(existing.status, incoming.status),
-    purchasedAt: incoming.purchasedAt,
   };
 
   return records.map((record, index) =>
@@ -213,10 +252,60 @@ export const convergePurchaseRecords = (
   );
 };
 
+const validateNewPurchaseConfiguration = async (
+  db: Awaited<typeof import("@/src/db")>["db"],
+  courses: typeof import("@/src/db/schema")["courses"],
+  users: typeof import("@/src/db/schema")["users"],
+  event: VerifiedStripeEvent,
+): Promise<void> => {
+  if (
+    !event.userId ||
+    !event.courseId ||
+    !event.stripePriceId ||
+    event.amount === null ||
+    !event.currency
+  ) {
+    throw new Error("Stripe event does not match server purchase configuration");
+  }
+
+  const [[course], [user]] = await Promise.all([
+    db
+      .select({
+        id: courses.id,
+        status: courses.status,
+        priceAmount: courses.priceAmount,
+        currency: courses.currency,
+        stripeProductId: courses.stripeProductId,
+        stripePriceId: courses.stripePriceId,
+      })
+      .from(courses)
+      .where(eq(courses.id, event.courseId))
+      .limit(1),
+    db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.id, event.userId))
+      .limit(1),
+  ]);
+
+  if (
+    !user ||
+    !course ||
+    course.status !== "published" ||
+    !course.stripePriceId ||
+    event.stripePriceId !== course.stripePriceId ||
+    event.stripeProductId !== (course.stripeProductId ?? null) ||
+    event.amount !== course.priceAmount ||
+    event.currency.toUpperCase() !== course.currency.toUpperCase()
+  ) {
+    throw new Error("Stripe event does not match server purchase configuration");
+  }
+};
+
 export async function handleStripeEvent(
   event: VerifiedStripeEvent,
 ): Promise<void> {
-  const [{ db }, { purchases }] = await Promise.all([
+  const [{ db }, { courses, purchases, users }] = await Promise.all([
     import("@/src/db"),
     import("@/src/db/schema"),
   ]);
@@ -226,33 +315,76 @@ export async function handleStripeEvent(
     .where(eq(purchases.stripePaymentIntentId, event.stripePaymentIntentId))
     .limit(1);
 
-  if (!existing && (!event.userId || !event.courseId || event.amount === null || !event.currency)) {
+  if (!existing) {
+    await validateNewPurchaseConfiguration(db, courses, users, event);
+
+    const record: PurchaseRecord = {
+      stripePaymentIntentId: event.stripePaymentIntentId,
+      stripeCheckoutSessionId: event.stripeCheckoutSessionId,
+      userId: event.userId as string,
+      courseId: event.courseId as string,
+      stripeProductId: event.stripeProductId,
+      stripePriceId: event.stripePriceId,
+      amount: event.amount as number,
+      currency: (event.currency as string).toUpperCase(),
+      status: event.status,
+      purchasedAt: event.purchasedAt,
+    };
+
+    await db
+      .insert(purchases)
+      .values(record)
+      .onConflictDoUpdate({
+        target: purchases.stripePaymentIntentId,
+        set: {
+          stripeCheckoutSessionId: record.stripeCheckoutSessionId,
+          stripeProductId: record.stripeProductId,
+          stripePriceId: record.stripePriceId,
+          userId: record.userId,
+          courseId: record.courseId,
+          amount: record.amount,
+          currency: record.currency,
+          status: sql`CASE
+            WHEN ${purchases.status} = 'revoked' THEN 'revoked'::purchase_status
+            WHEN ${purchases.status} = 'refunded' AND excluded.status IN ('pending'::purchase_status, 'paid'::purchase_status) THEN 'refunded'::purchase_status
+            WHEN ${purchases.status} = 'paid' AND excluded.status = 'pending'::purchase_status THEN 'paid'::purchase_status
+            ELSE excluded.status
+          END`,
+          purchasedAt: record.purchasedAt,
+          updatedAt: new Date(),
+        },
+      });
     return;
   }
 
-  const record: PurchaseRecord = {
-    stripePaymentIntentId: event.stripePaymentIntentId,
-    stripeCheckoutSessionId:
-      event.stripeCheckoutSessionId ?? existing?.stripeCheckoutSessionId ?? null,
-    userId: event.userId ?? existing?.userId ?? "",
-    courseId: event.courseId ?? existing?.courseId ?? "",
-    stripeProductId: event.stripeProductId ?? existing?.stripeProductId ?? null,
-    stripePriceId: event.stripePriceId ?? existing?.stripePriceId ?? null,
-    amount: event.amount ?? existing?.amount ?? 0,
-    currency: (event.currency ?? existing?.currency ?? "INR").toUpperCase(),
+  if (hasConflictingExistingMetadata(existing, event)) {
+    throw new Error("Stripe event conflicts with existing purchase");
+  }
+
+  if (event.disputeWon) {
+    await db
+      .update(purchases)
+      .set({ status: "paid", updatedAt: new Date() })
+      .where(eq(purchases.stripePaymentIntentId, event.stripePaymentIntentId));
+    return;
+  }
+
+  const incoming: PurchaseRecord = {
+    stripePaymentIntentId: existing.stripePaymentIntentId,
+    stripeCheckoutSessionId: existing.stripeCheckoutSessionId,
+    userId: existing.userId,
+    courseId: existing.courseId,
+    stripeProductId: existing.stripeProductId,
+    stripePriceId: existing.stripePriceId,
+    amount: existing.amount,
+    currency: existing.currency,
     status: event.status,
-    purchasedAt: event.purchasedAt,
+    purchasedAt: existing.purchasedAt,
   };
-
-  if (!record.userId || !record.courseId) {
-    return;
-  }
-
-  const converged = convergePurchaseRecords(existing ? [existing] : [], event, record);
-  const purchase = converged[0];
+  const purchase = convergePurchaseRecords([existing], event, incoming)[0];
 
   if (!purchase) {
-    return;
+    throw new Error("Stripe purchase could not be resolved");
   }
 
   await db
@@ -270,10 +402,10 @@ export async function handleStripeEvent(
         currency: purchase.currency,
         status: sql`CASE
           WHEN ${purchases.status} = 'revoked' THEN 'revoked'::purchase_status
-          WHEN ${purchases.status} = 'refunded' AND excluded.status = 'paid'::purchase_status THEN 'refunded'::purchase_status
+          WHEN ${purchases.status} = 'refunded' AND excluded.status IN ('pending'::purchase_status, 'paid'::purchase_status) THEN 'refunded'::purchase_status
+          WHEN ${purchases.status} = 'paid' AND excluded.status = 'pending'::purchase_status THEN 'paid'::purchase_status
           ELSE excluded.status
         END`,
-        purchasedAt: purchase.purchasedAt,
         updatedAt: new Date(),
       },
     });

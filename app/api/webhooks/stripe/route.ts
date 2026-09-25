@@ -7,8 +7,9 @@ import {
 
 export async function POST(request: Request): Promise<Response> {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 
-  if (!webhookSecret) {
+  if (!webhookSecret || !stripeSecretKey) {
     return new Response("Webhook is not configured", { status: 500 });
   }
 
@@ -22,7 +23,7 @@ export async function POST(request: Request): Promise<Response> {
   let stripeEvent: Stripe.Event;
 
   try {
-    const stripe = new Stripe(webhookSecret, { typescript: true });
+    const stripe = new Stripe(stripeSecretKey, { typescript: true });
     stripeEvent = await stripe.webhooks.constructEventAsync(
       rawBody,
       signature,

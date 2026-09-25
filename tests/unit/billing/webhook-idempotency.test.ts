@@ -19,6 +19,8 @@ const event = {
   amount: 49900,
   currency: "inr",
   status: "paid",
+  stripeEventType: "checkout.session.completed",
+  disputeWon: false,
   purchasedAt: new Date("2026-09-25T12:00:00.000Z"),
 } satisfies VerifiedStripeEvent;
 
@@ -90,6 +92,98 @@ describe("verified Stripe event convergence", () => {
     expect(mapStripeEventToPurchase(stripeEvent)).toEqual(event);
   });
 
+  it("keeps an unpaid async Checkout Session pending", () => {
+    const stripeEvent = {
+      id: "evt_checkout_unpaid",
+      type: "checkout.session.completed",
+      created: 1_790_337_600,
+      data: {
+        object: {
+          id: "cs_test_unpaid",
+          payment_intent: "pi_unpaid",
+          payment_status: "unpaid",
+          amount_total: 49900,
+          currency: "inr",
+          metadata: {
+            clerkUserId: "user_123",
+            courseId: "course-123",
+            stripeProductId: "prod_course_123",
+            stripePriceId: "price_course_123",
+          },
+        },
+      },
+    } as unknown as Stripe.Event;
+
+    expect(mapStripeEventToPurchase(stripeEvent)?.status).toBe("pending");
+  });
+
+  it("maps successful async payment to paid", () => {
+    const stripeEvent = {
+      id: "evt_checkout_async_success",
+      type: "checkout.session.async_payment_succeeded",
+      created: 1_790_337_600,
+      data: {
+        object: {
+          id: "cs_test_async",
+          payment_intent: "pi_async",
+          payment_status: "unpaid",
+          amount_total: 49900,
+          currency: "inr",
+          metadata: {
+            clerkUserId: "user_123",
+            courseId: "course-123",
+            stripeProductId: "prod_course_123",
+            stripePriceId: "price_course_123",
+          },
+        },
+      },
+    } as unknown as Stripe.Event;
+
+    expect(mapStripeEventToPurchase(stripeEvent)?.status).toBe("paid");
+  });
+
+  it("maps a dispute closed as won to an explicit restoration", () => {
+    const stripeEvent = {
+      id: "evt_dispute_won",
+      type: "dispute.closed",
+      created: 1_790_337_600,
+      data: {
+        object: {
+          id: "dp_won",
+          payment_intent: "pi_one_time_123",
+          status: "won",
+        },
+      },
+    } as unknown as Stripe.Event;
+
+    expect(mapStripeEventToPurchase(stripeEvent)).toMatchObject({
+      stripePaymentIntentId: "pi_one_time_123",
+      status: "paid",
+      disputeWon: true,
+    });
+  });
+
+  it("maps a lost dispute to revoked", () => {
+    const stripeEvent = {
+      id: "evt_dispute_lost",
+      type: "dispute.closed",
+      created: 1_790_337_600,
+      data: {
+        object: {
+          id: "dp_lost",
+          payment_intent: "pi_one_time_123",
+          status: "lost",
+        },
+      },
+    } as unknown as Stripe.Event;
+
+    expect(mapStripeEventToPurchase(stripeEvent)).toMatchObject({
+      stripePaymentIntentId: "pi_one_time_123",
+      status: "revoked",
+      disputeWon: false,
+    });
+  });
+
   it("rejects an unsafe Checkout Session without trusted course metadata", () => {
     const stripeEvent = {
       id: "evt_checkout_unsafe",
@@ -133,6 +227,8 @@ describe("verified Stripe event convergence", () => {
       amount: null,
       currency: null,
       status: "revoked",
+      stripeEventType: "charge.dispute.created",
+      disputeWon: false,
       purchasedAt: new Date(1_790_337_600 * 1_000),
     });
   });

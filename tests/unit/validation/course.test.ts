@@ -26,10 +26,28 @@ describe("course validation", () => {
     expect(courseInputSchema.safeParse({ ...course, title: "  " }).success).toBe(false);
   });
 
-  it("requires a positive price when a Clerk price is configured", () => {
+  it("requires a positive price when a Stripe price is configured", () => {
     expect(
-      courseInputSchema.safeParse({ ...course, priceAmount: 0, clerkPriceId: "price_123" }).success,
+      courseInputSchema.safeParse({
+        ...course,
+        priceAmount: 0,
+        stripeProductId: "prod_123",
+        stripePriceId: "price_123",
+      }).success,
     ).toBe(false);
+  });
+
+  it("accepts Stripe product and price identifiers", () => {
+    const input = {
+      ...course,
+      stripeProductId: "prod_123",
+      stripePriceId: "price_123",
+    };
+
+    expect(courseInputSchema.parse(input)).toMatchObject(input);
+    expect(
+      courseInputSchema.parse({ ...input, clerkProductId: "prod_obsolete" }),
+    ).not.toHaveProperty("clerkProductId");
   });
 });
 
