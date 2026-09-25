@@ -464,6 +464,7 @@ git commit -m "feat: add course queries and progress rules"
 - Modify: `src/db/schema/courses.ts`
 - Modify: `src/db/schema/purchases.ts`
 - Modify: `src/db/schema/index.ts`
+- Modify: `src/db/seed/data.ts`
 - Modify: `tests/unit/db/schema-contract.test.ts`
 - Create: `drizzle/0002_stripe_purchase_contract.sql` (generated name may vary)
 - Create: `src/lib/billing/checkout.ts`
@@ -516,7 +517,7 @@ bun run build
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/db/schema drizzle src/lib/billing src/actions/billing.ts app/api/webhooks/stripe tests/unit/billing tests/unit/db .env.example package.json bun.lock
+git add src/db/schema src/db/seed/data.ts drizzle src/lib/billing src/actions/billing.ts app/api/webhooks/stripe tests/unit/billing tests/unit/db .env.example package.json bun.lock
 git commit -m "feat: add Stripe purchases and entitlements"
 ```
 
