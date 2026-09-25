@@ -11,12 +11,28 @@ import {
 } from "../../lib/cache/tags";
 import { courses, lessons, modules } from "../schema";
 import {
+  featuredCourseColumns,
+  featuredCourseLimit,
+  featuredCourseOrderBy,
   previewLessonPublicColumns,
   previewLessonWhere,
   publishedCourseCatalogOrderBy,
   publishedCourseWhere,
   publishedCourseWithSyllabus,
 } from "./query-boundaries";
+
+export async function getFeaturedCourses() {
+  "use cache";
+
+  cacheTag(publishedCoursesCacheTag);
+
+  return db.query.courses.findMany({
+    columns: featuredCourseColumns,
+    where: publishedCourseWhere(),
+    orderBy: featuredCourseOrderBy,
+    limit: featuredCourseLimit,
+  });
+}
 
 export async function getPublishedCourses() {
   "use cache";

@@ -21,6 +21,18 @@ export const publicCourseColumns = {
   publishedAt: true,
 } as const;
 
+export const featuredCourseColumns = {
+  slug: true,
+  title: true,
+  shortDescription: true,
+  description: true,
+  priceAmount: true,
+  currency: true,
+  estimatedDurationMinutes: true,
+} as const;
+
+export const featuredCourseLimit = 3;
+
 export const publicModuleColumns = {
   id: true,
   title: true,
@@ -74,6 +86,11 @@ export const publishedCourseWhere = (): SQL =>
   eq(courses.status, "published");
 
 export const publishedCourseCatalogOrderBy: SQL[] = [
+  asc(courses.title),
+  asc(courses.slug),
+];
+
+export const featuredCourseOrderBy: SQL[] = [
   asc(courses.title),
   asc(courses.slug),
 ];

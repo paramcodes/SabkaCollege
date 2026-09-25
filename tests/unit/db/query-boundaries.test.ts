@@ -3,6 +3,9 @@ import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
 import {
+  featuredCourseColumns,
+  featuredCourseLimit,
+  featuredCourseOrderBy,
   previewLessonPublicColumns,
   previewLessonWhere,
   progressForUserWhere,
@@ -23,6 +26,26 @@ const compile = (query: Parameters<PgDialect["sqlToQuery"]>[0]) => {
 };
 
 describe("public course query boundaries", () => {
+  it("selects only landing fields and returns at most three deterministic featured courses", () => {
+    expect(featuredCourseColumns).toEqual({
+      slug: true,
+      title: true,
+      shortDescription: true,
+      description: true,
+      priceAmount: true,
+      currency: true,
+      estimatedDurationMinutes: true,
+    });
+    expect(featuredCourseColumns).not.toHaveProperty("videoReference");
+    expect(featuredCourseColumns).not.toHaveProperty("stripeProductId");
+    expect(featuredCourseColumns).not.toHaveProperty("stripePriceId");
+    expect(featuredCourseLimit).toBe(3);
+    expect(featuredCourseOrderBy).toEqual([
+      asc(courses.title),
+      asc(courses.slug),
+    ]);
+  });
+
   it("only selects published courses", () => {
     const compiled = compile(publishedCourseWhere());
 

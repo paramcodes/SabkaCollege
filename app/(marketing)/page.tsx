@@ -16,8 +16,9 @@ import { HeroMotion } from "@/src/components/motion/hero-motion";
 import { Reveal } from "@/src/components/motion/reveal";
 import { Badge } from "@/src/components/ui/badge";
 import { Button } from "@/src/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/src/components/ui/card";
 import { landingContent } from "@/src/lib/content/landing";
+import { formatCoursePrice } from "@/src/lib/formatting/currency";
 
 export const metadata: Metadata = {
   title: "SabkaCollege — Learn with purpose",
@@ -52,12 +53,14 @@ async function getFeaturedCourses(): Promise<CatalogueResult> {
     };
   }
 
-  try {
-    await connection();
-    const { getPublishedCourses } = await import("@/src/db/queries/courses");
-    const courses = await getPublishedCourses();
+  await connection();
 
-    return { status: "courses", courses: courses.slice(0, 3) };
+  try {
+    const { getFeaturedCourses: getFeaturedCoursesFromDatabase } =
+      await import("@/src/db/queries/courses");
+    const courses = await getFeaturedCoursesFromDatabase();
+
+    return { status: "courses", courses };
   } catch (error) {
     console.error("Unable to load featured courses", error);
 
@@ -65,18 +68,6 @@ async function getFeaturedCourses(): Promise<CatalogueResult> {
       status: "unavailable",
       message: "The course catalogue is temporarily unavailable. Please try again soon.",
     };
-  }
-}
-
-function formatPrice(course: FeaturedCourse) {
-  try {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: course.currency,
-      maximumFractionDigits: 0,
-    }).format(course.priceAmount / 100);
-  } catch {
-    return "See course price";
   }
 }
 
@@ -93,11 +84,7 @@ function SectionHeading({
 }) {
   return (
     <div className="max-w-3xl">
-      <p
-        className={`text-xs font-semibold tracking-[0.2em] uppercase ${
-          inverse ? "text-primary" : "text-primary"
-        }`}
-      >
+      <p className="text-xs font-semibold tracking-[0.2em] text-primary uppercase">
         {eyebrow}
       </p>
       <h2
@@ -152,9 +139,9 @@ function FeaturedCourses({ result }: { result: CatalogueResult }) {
                       {course.duration}
                     </span>
                   </div>
-                  <CardTitle className="font-serif text-3xl leading-tight tracking-[-0.025em]">
+                  <h3 className="font-serif text-3xl leading-tight tracking-[-0.025em]">
                     {course.title}
-                  </CardTitle>
+                  </h3>
                 </CardHeader>
                 <CardContent className="px-0 sm:px-7">
                   <p className="min-h-20 leading-7 text-muted-foreground">
@@ -168,7 +155,10 @@ function FeaturedCourses({ result }: { result: CatalogueResult }) {
                       <p className="mt-1 font-serif text-2xl">{course.price}</p>
                     </div>
                     <Button asChild variant="ghost" className="px-0 hover:bg-transparent hover:text-primary">
-                      <Link href={`/courses/${course.slug}`}>
+                      <Link
+                        href={`/courses/${course.slug}`}
+                        aria-label={`View ${course.title} course`}
+                      >
                         View course <ArrowRight aria-hidden="true" />
                       </Link>
                     </Button>
@@ -211,18 +201,23 @@ function FeaturedCourses({ result }: { result: CatalogueResult }) {
                 </span>
                 <span>Course {String(index + 1).padStart(2, "0")}</span>
               </div>
-              <CardTitle className="font-serif text-2xl leading-tight tracking-[-0.025em]">
+              <h3 className="font-serif text-2xl leading-tight tracking-[-0.025em]">
                 {course.title}
-              </CardTitle>
+              </h3>
             </CardHeader>
             <CardContent className="flex flex-1 flex-col px-6">
               <p className="line-clamp-4 leading-7 text-muted-foreground">
                 {course.shortDescription ?? course.description}
               </p>
               <div className="mt-auto flex items-end justify-between border-t border-border pt-5">
-                <p className="font-serif text-xl">{formatPrice(course)}</p>
+                <p className="font-serif text-xl">
+                  {formatCoursePrice(course.priceAmount, course.currency)}
+                </p>
                 <Button asChild variant="ghost" className="px-0 hover:bg-transparent hover:text-primary">
-                  <Link href={`/courses/${course.slug}`}>
+                  <Link
+                    href={`/courses/${course.slug}`}
+                    aria-label={`View ${course.title} course`}
+                  >
                     View <ArrowRight aria-hidden="true" />
                   </Link>
                 </Button>
@@ -242,7 +237,6 @@ async function FeaturedCoursesSection() {
 }
 
 export default async function LandingPage() {
-
   return (
     <>
       <section className="relative border-b border-foreground/15">

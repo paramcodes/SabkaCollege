@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
 import Link from "next/link";
 
@@ -13,8 +13,31 @@ const navigation = [
 
 export function SiteHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const firstMobileNavigationLinkRef = useRef<HTMLAnchorElement>(null);
 
   const closeMenu = () => setIsMenuOpen(false);
+
+  useEffect(() => {
+    if (!isMenuOpen) {
+      return;
+    }
+
+    firstMobileNavigationLinkRef.current?.focus();
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      event.preventDefault();
+      setIsMenuOpen(false);
+      toggleRef.current?.focus();
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isMenuOpen]);
 
   return (
     <header className="sticky top-0 z-50 border-b border-foreground/15 bg-background/95 backdrop-blur">
@@ -54,6 +77,7 @@ export function SiteHeader() {
         </div>
 
         <Button
+          ref={toggleRef}
           type="button"
           variant="outline"
           size="icon-lg"
@@ -74,9 +98,10 @@ export function SiteHeader() {
           className="border-t border-foreground/15 bg-background px-5 py-5 md:hidden"
         >
           <div className="mx-auto flex max-w-7xl flex-col gap-1">
-            {navigation.map((item) => (
+            {navigation.map((item, index) => (
               <Link
                 key={item.href}
+                ref={index === 0 ? firstMobileNavigationLinkRef : undefined}
                 href={item.href}
                 className="rounded-lg px-3 py-3 text-base font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
                 onClick={closeMenu}
