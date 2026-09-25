@@ -1,12 +1,19 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { BookOpen, CreditCard, LayoutDashboard, Users } from "lucide-react";
 
 import { requireAdmin } from "@/src/lib/auth/guards";
 import { Badge } from "@/src/components/ui/badge";
 
+const adminReturnPath = "/admin";
+
 export default async function AdminLayout({ children }: { children: ReactNode }) {
-  await requireAdmin();
+  try {
+    await requireAdmin();
+  } catch {
+    redirect(`/sign-in?redirect_url=${encodeURIComponent(adminReturnPath)}`);
+  }
 
   return (
     <div className="min-h-screen bg-muted/20">

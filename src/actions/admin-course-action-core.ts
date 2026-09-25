@@ -91,6 +91,8 @@ export type AdminCourseActionErrorCode =
   | "UNAUTHENTICATED"
   | "FORBIDDEN"
   | "INVALID_INPUT"
+  | "NOT_FOUND"
+  | "NOT_READY"
   | "DATABASE_ERROR"
   | "CACHE_ERROR";
 
@@ -170,6 +172,33 @@ const cacheError = (): AdminCourseActionResult<never> => ({
   },
 });
 
+const repositoryError = (error: unknown): AdminCourseActionResult<never> => {
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+
+  if (message.includes("not found")) {
+    return {
+      ok: false,
+      error: {
+        code: "NOT_FOUND",
+        message: "The requested course content could not be found.",
+      },
+    };
+  }
+
+  if (message.includes("not ready to publish")) {
+    return {
+      ok: false,
+      error: {
+        code: "NOT_READY",
+        message:
+          "The course is not ready to publish. Add a price, Stripe product and price, a module, and a lesson before publishing.",
+      },
+    };
+  }
+
+  return databaseError();
+};
+
 const authorize = async (
   requireAdmin: AdminCourseActionDependencies["requireAdmin"],
 ): Promise<AdminCourseActionResult<never> | { ok: true; data: AppUser }> => {
@@ -232,8 +261,8 @@ export function createAdminCourseActions({
       let saved: { id: string };
       try {
         saved = await repository.saveCourse(normalized);
-      } catch {
-        return databaseError();
+      } catch (error) {
+        return repositoryError(error);
       }
 
       try {
@@ -257,8 +286,8 @@ export function createAdminCourseActions({
       let saved: { id: string };
       try {
         saved = await repository.saveModule(normalized);
-      } catch {
-        return databaseError();
+      } catch (error) {
+        return repositoryError(error);
       }
 
       try {
@@ -282,8 +311,8 @@ export function createAdminCourseActions({
       let saved: { id: string; courseId: string };
       try {
         saved = await repository.saveLesson(normalized);
-      } catch {
-        return databaseError();
+      } catch (error) {
+        return repositoryError(error);
       }
 
       try {
@@ -306,8 +335,8 @@ export function createAdminCourseActions({
 
       try {
         await repository.reorderModules({ ...parsed.data, moduleIds });
-      } catch {
-        return databaseError();
+      } catch (error) {
+        return repositoryError(error);
       }
 
       try {
@@ -334,8 +363,8 @@ export function createAdminCourseActions({
           moduleId: parsed.data.moduleId,
           lessonIds,
         });
-      } catch {
-        return databaseError();
+      } catch (error) {
+        return repositoryError(error);
       }
 
       try {
@@ -357,8 +386,8 @@ export function createAdminCourseActions({
 
       try {
         await repository.setCourseStatus(parsed.data);
-      } catch {
-        return databaseError();
+      } catch (error) {
+        return repositoryError(error);
       }
 
       try {
@@ -381,8 +410,8 @@ export function createAdminCourseActions({
       let deleted: { courseId: string };
       try {
         deleted = await repository.deleteCourse(parsed.data);
-      } catch {
-        return databaseError();
+      } catch (error) {
+        return repositoryError(error);
       }
 
       try {
@@ -405,8 +434,8 @@ export function createAdminCourseActions({
       let deleted: { courseId: string };
       try {
         deleted = await repository.deleteModule(parsed.data);
-      } catch {
-        return databaseError();
+      } catch (error) {
+        return repositoryError(error);
       }
 
       try {
@@ -429,8 +458,8 @@ export function createAdminCourseActions({
       let deleted: { courseId: string };
       try {
         deleted = await repository.deleteLesson(parsed.data);
-      } catch {
-        return databaseError();
+      } catch (error) {
+        return repositoryError(error);
       }
 
       try {

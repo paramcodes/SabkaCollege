@@ -230,22 +230,22 @@ export const adminCourseRepository: AdminCourseRepository = {
   },
 
   async setCourseStatus({ courseId, status }) {
+    const [current] = await db
+      .select({ status: courses.status, publishedAt: courses.publishedAt })
+      .from(courses)
+      .where(eq(courses.id, courseId))
+      .limit(1);
+    if (!current) throw new Error("Course not found");
+
     if (status === "published") {
       await assertCoursePublishReady(courseId);
-    } else {
-      const [course] = await db
-        .select({ id: courses.id })
-        .from(courses)
-        .where(eq(courses.id, courseId))
-        .limit(1);
-      if (!course) throw new Error("Course not found");
     }
 
     const [saved] = await db
       .update(courses)
       .set({
         status,
-        publishedAt: status === "published" ? new Date() : null,
+        publishedAt: status === "published" ? (current.publishedAt ?? new Date()) : null,
         updatedAt: new Date(),
       })
       .where(eq(courses.id, courseId))

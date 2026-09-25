@@ -13,7 +13,9 @@ for (const route of adminRoutes) {
   test(`admin route fails closed for signed-out users: ${route}`, async ({ page }) => {
     await page.goto(route);
 
-    await expect(page).not.toHaveURL(/\/admin(?:\/|$)/);
+    await expect(page).toHaveURL(
+      /\/sign-in\?redirect_url=%2Fadmin(?:&|$)/i,
+    );
     await expect(page.locator("body")).not.toContainText("SabkaCollege Admin");
     await expect(page.locator("body")).not.toContainText("New course");
   });

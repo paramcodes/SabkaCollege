@@ -189,6 +189,8 @@ describe("admin course action success", () => {
     expect(result).toEqual({ ok: true, data: { id: lessonId } });
     expect(repository.saveLesson).toHaveBeenCalledWith(
       expect.objectContaining({
+        id: lessonId,
+        moduleId,
         slug: "course-outline",
         title: "Course outline",
       }),
@@ -268,19 +270,26 @@ describe("admin course action success", () => {
     expect(result).toEqual({
       ok: false,
       error: {
-        code: "DATABASE_ERROR",
-        message: "The course could not be saved. Please try again.",
+        code: "NOT_READY",
+        message:
+          "The course is not ready to publish. Add a price, Stripe product and price, a module, and a lesson before publishing.",
       },
     });
     expect(invalidateCourse).not.toHaveBeenCalled();
   });
 
-  it("reports a missing course as a database error", async () => {
+  it("reports missing repository content as not found", async () => {
     repository.deleteCourse.mockRejectedValueOnce(new Error("Course not found"));
 
     const result = await actions.deleteCourse({ courseId });
 
-    expect(result.ok).toBe(false);
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: "NOT_FOUND",
+        message: "The requested course content could not be found.",
+      },
+    });
     expect(repository.deleteCourse).toHaveBeenCalledTimes(1);
     expect(invalidateCourse).not.toHaveBeenCalled();
   });
