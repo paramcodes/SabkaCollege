@@ -165,6 +165,9 @@ describe("Stripe webhook database validation", () => {
     ["course", { courseId: "20000000-0000-4000-8000-000000000099" }],
     ["product", { stripeProductId: "prod_conflict" }],
     ["price", { stripePriceId: "price_conflict" }],
+    ["session", { stripeCheckoutSessionId: "cs_conflict" }],
+    ["amount", { amount: 1 }],
+    ["currency", { currency: "usd" }],
   ] as const)(
     "rejects conflicting %s metadata for an existing purchase",
     async (_field, conflict) => {
@@ -181,6 +184,26 @@ describe("Stripe webhook database validation", () => {
       expect(mocks.updateSet).not.toHaveBeenCalled();
     },
   );
+
+  it("fills a missing stored checkout session ID from a verified event", async () => {
+    mocks.purchaseRows = [
+      { ...existingPurchase, stripeCheckoutSessionId: null },
+    ];
+
+    await handleStripeEvent({
+      ...validEvent,
+      stripePaymentIntentId: "pi_existing_123",
+      stripeCheckoutSessionId: "cs_valid_123",
+    });
+
+    expect(mocks.insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stripeCheckoutSessionId: "cs_valid_123",
+        userId: "user_123",
+        courseId,
+      }),
+    );
+  });
 
   it("uses stored identity for a metadata-free dispute event", async () => {
     mocks.purchaseRows = [{ ...existingPurchase }];
@@ -211,27 +234,78 @@ describe("Stripe webhook database validation", () => {
     );
   });
 
-  it("restores a revoked purchase only for an explicit won dispute", async () => {
+  it.each(["revoked", "refunded", "pending"] as const)(
+    "uses conditional SQL when a won dispute follows %s",
+    async (currentStatus) => {
+      mocks.purchaseRows = [{ ...existingPurchase, status: currentStatus }];
+
+      await handleStripeEvent({
+        stripePaymentIntentId: "pi_existing_123",
+        stripeCheckoutSessionId: null,
+        userId: null,
+        courseId: null,
+        stripeProductId: null,
+        stripePriceId: null,
+        amount: null,
+        currency: null,
+        status: "paid",
+        stripeEventType: "dispute.closed",
+        disputeWon: true,
+        purchasedAt: new Date("2026-09-26T12:00:00.000Z"),
+      });
+
+      expect(mocks.updateSet).toHaveBeenCalledWith(
+        expect.objectContaining({ status: expect.anything() }),
+      );
+      expect(mocks.updateWhere).toHaveBeenCalledWith(expect.anything());
+      expect(mocks.insertValues).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps a stale paid event revoked", async () => {
     mocks.purchaseRows = [{ ...existingPurchase, status: "revoked" }];
 
     await handleStripeEvent({
+      ...validEvent,
       stripePaymentIntentId: "pi_existing_123",
-      stripeCheckoutSessionId: null,
-      userId: null,
-      courseId: null,
-      stripeProductId: null,
-      stripePriceId: null,
-      amount: null,
-      currency: null,
-      status: "paid",
-      stripeEventType: "dispute.closed",
-      disputeWon: true,
-      purchasedAt: new Date("2026-09-26T12:00:00.000Z"),
+      stripeCheckoutSessionId: "cs_existing_123",
     });
 
-    expect(mocks.updateSet).toHaveBeenCalledWith(
-      expect.objectContaining({ status: "paid" }),
+    expect(mocks.insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "revoked" }),
     );
-    expect(mocks.insertValues).not.toHaveBeenCalled();
+    expect(mocks.updateSet).not.toHaveBeenCalled();
+  });
+
+  it("converges payment intent success before checkout completion", async () => {
+    let persisted:
+      | (typeof existingPurchase & { stripeCheckoutSessionId: string | null })
+      | undefined;
+    mocks.insertValues.mockImplementation((value) => {
+      persisted = {
+        ...existingPurchase,
+        ...value,
+        stripePaymentIntentId: "pi_valid_123",
+      };
+      mocks.purchaseRows = [persisted];
+      return { onConflictDoUpdate: mocks.onConflictDoUpdate };
+    });
+
+    const paymentIntentEvent: VerifiedStripeEvent = {
+      ...validEvent,
+      stripeCheckoutSessionId: null,
+      stripeEventType: "payment_intent.succeeded",
+    };
+
+    await handleStripeEvent(paymentIntentEvent);
+    expect(persisted?.stripeCheckoutSessionId).toBeNull();
+
+    await handleStripeEvent(validEvent);
+
+    expect(persisted).toMatchObject({
+      stripeCheckoutSessionId: "cs_valid_123",
+      userId: "user_123",
+      courseId,
+    });
   });
 });

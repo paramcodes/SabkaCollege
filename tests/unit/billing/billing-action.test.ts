@@ -4,7 +4,11 @@ import type { AppUser } from "../../../src/lib/validation/user";
 
 const requireUserMock = vi.fn<() => Promise<AppUser>>();
 const createCourseCheckoutMock =
-  vi.fn<() => Promise<{ checkoutUrl: string }>>();
+  vi.fn<
+    (input: { courseSlug: string; userId: string }) => Promise<{
+      checkoutUrl: string;
+    }>
+  >();
 
 vi.mock("server-only", () => ({}));
 vi.mock("../../../src/lib/auth/guards", () => ({
@@ -33,7 +37,24 @@ beforeEach(() => {
   requireUserMock.mockResolvedValue(user);
 });
 
-describe("billing action error contract", () => {
+describe("billing action contract", () => {
+  it("passes the authenticated user and normalized course slug to checkout", async () => {
+    createCourseCheckoutMock.mockResolvedValue({
+      checkoutUrl: "https://checkout.stripe.test/session_123",
+    });
+
+    const result = await startCourseCheckout({ courseSlug: "  course-slug  " });
+
+    expect(createCourseCheckoutMock).toHaveBeenCalledWith({
+      courseSlug: "course-slug",
+      userId: "user_123",
+    });
+    expect(result).toEqual({
+      ok: true,
+      data: { checkoutUrl: "https://checkout.stripe.test/session_123" },
+    });
+  });
+
   it("returns a redacted unauthenticated result when authentication fails", async () => {
     requireUserMock.mockRejectedValue(
       new Error("Clerk token sk_live_should_not_escape"),

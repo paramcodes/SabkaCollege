@@ -67,6 +67,57 @@ describe("verified Stripe event convergence", () => {
     }
   });
 
+  it("fills a missing stored checkout session ID without changing identity", () => {
+    const result = convergePurchaseRecords(
+      [record({ stripeCheckoutSessionId: null })],
+      event,
+      record({ stripeCheckoutSessionId: null }),
+    );
+
+    expect(result[0]).toMatchObject({
+      stripeCheckoutSessionId: "cs_test_123",
+      userId: "user_123",
+      courseId: "course-123",
+    });
+  });
+
+  it("rejects conflicting non-null checkout session IDs", () => {
+    expect(() =>
+      convergePurchaseRecords(
+        [record()],
+        { ...event, stripeCheckoutSessionId: "cs_other" },
+        record({ stripeCheckoutSessionId: "cs_other" }),
+      ),
+    ).toThrow("Stripe event conflicts with existing purchase");
+  });
+
+  it.each([
+    ["revoked", "paid"],
+    ["refunded", "refunded"],
+    ["pending", "pending"],
+  ] as const)(
+    "restores a won dispute only from revoked status (%s -> %s)",
+    (currentStatus, expectedStatus) => {
+      const result = convergePurchaseRecords(
+        [record({ status: currentStatus })],
+        { ...event, status: "paid", disputeWon: true },
+        record({ status: "paid" }),
+      );
+
+      expect(result[0]?.status).toBe(expectedStatus);
+    },
+  );
+
+  it("keeps a stale paid event from restoring a revoked purchase", () => {
+    const result = convergePurchaseRecords(
+      [record({ status: "revoked" })],
+      event,
+      record(),
+    );
+
+    expect(result[0]?.status).toBe("revoked");
+  });
+
   it("maps a paid Checkout Session from server-controlled metadata", () => {
     const stripeEvent = {
       id: "evt_checkout_123",

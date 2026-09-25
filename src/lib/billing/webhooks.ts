@@ -213,6 +213,7 @@ const hasConflictingExistingMetadata = (
   (event.stripePriceId !== null &&
     event.stripePriceId !== existing.stripePriceId) ||
   (event.stripeCheckoutSessionId !== null &&
+    existing.stripeCheckoutSessionId !== null &&
     event.stripeCheckoutSessionId !== existing.stripeCheckoutSessionId) ||
   (event.amount !== null &&
     !isRefundEvent(event.stripeEventType) &&
@@ -244,7 +245,13 @@ export const convergePurchaseRecords = (
 
   const converged: PurchaseRecord = {
     ...existing,
-    status: nextPurchaseStatus(existing.status, incoming.status),
+    stripeCheckoutSessionId:
+      existing.stripeCheckoutSessionId ?? event.stripeCheckoutSessionId,
+    status: event.disputeWon
+      ? existing.status === "revoked"
+        ? "paid"
+        : existing.status
+      : nextPurchaseStatus(existing.status, incoming.status),
   };
 
   return records.map((record, index) =>
@@ -337,7 +344,7 @@ export async function handleStripeEvent(
       .onConflictDoUpdate({
         target: purchases.stripePaymentIntentId,
         set: {
-          stripeCheckoutSessionId: record.stripeCheckoutSessionId,
+          stripeCheckoutSessionId: sql`coalesce(${purchases.stripeCheckoutSessionId}, ${record.stripeCheckoutSessionId})`,
           stripeProductId: record.stripeProductId,
           stripePriceId: record.stripePriceId,
           userId: record.userId,
@@ -364,14 +371,21 @@ export async function handleStripeEvent(
   if (event.disputeWon) {
     await db
       .update(purchases)
-      .set({ status: "paid", updatedAt: new Date() })
+      .set({
+        status: sql`CASE
+          WHEN ${purchases.status} = 'revoked' THEN 'paid'::purchase_status
+          ELSE ${purchases.status}
+        END`,
+        updatedAt: new Date(),
+      })
       .where(eq(purchases.stripePaymentIntentId, event.stripePaymentIntentId));
     return;
   }
 
   const incoming: PurchaseRecord = {
     stripePaymentIntentId: existing.stripePaymentIntentId,
-    stripeCheckoutSessionId: existing.stripeCheckoutSessionId,
+    stripeCheckoutSessionId:
+      event.stripeCheckoutSessionId ?? existing.stripeCheckoutSessionId,
     userId: existing.userId,
     courseId: existing.courseId,
     stripeProductId: existing.stripeProductId,
