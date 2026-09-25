@@ -29,8 +29,8 @@ export type StudentDashboardCourse = {
 export type ContinueLearningData = {
   courseSlug: string;
   courseTitle: string;
-  lessonSlug?: string;
-  lessonTitle?: string;
+  lessonSlug: string;
+  lessonTitle: string;
   href: string;
 };
 
@@ -196,13 +196,7 @@ export function buildStudentDashboardData(
         lessonTitle: selected.lesson.title,
         href: learningHref(selected.course.slug, selected.lesson.slug),
       }
-    : courses[0]
-      ? {
-          courseSlug: courses[0].slug,
-          courseTitle: courses[0].title,
-          href: learningHref(courses[0].slug),
-        }
-      : null;
+    : null;
 
   return {
     overallProgress: calculateCourseProgress(totalLessons, completedLessons),

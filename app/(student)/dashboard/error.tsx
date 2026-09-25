@@ -13,7 +13,7 @@ export default function StudentDashboardError({
 }) {
   return (
     <main className="mx-auto flex min-h-[70vh] max-w-3xl items-center px-5 py-20 sm:px-8">
-      <Card className="w-full">
+      <Card className="w-full" role="alert">
         <CardHeader>
           <p className="text-sm font-medium text-primary">Student dashboard</p>
           <CardTitle className="mt-2 font-serif text-3xl">

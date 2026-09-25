@@ -145,3 +145,25 @@ export const progressForUserWhere = (userId: string): SQL => {
 
   return eq(lessonProgress.userId, parsedUserId.data);
 };
+
+export const studentDashboardProgressWhere = (userId: string): SQL => {
+  const parsedUserId = userIdSchema.safeParse(userId);
+
+  if (!parsedUserId.success) {
+    throw new Error("A server-derived user ID is required.");
+  }
+
+  return and(
+    eq(lessonProgress.userId, parsedUserId.data),
+    sql`exists (
+      select 1
+      from ${lessons}
+      inner join ${modules} on ${modules.id} = ${lessons.moduleId}
+      inner join ${courses} on ${courses.id} = ${modules.courseId}
+      inner join ${purchases} on ${purchases.courseId} = ${courses.id}
+      where ${lessons.id} = ${lessonProgress.lessonId}
+        and ${purchases.userId} = ${parsedUserId.data}
+        and ${purchases.status} = ${"paid"}
+    )`,
+  ) as SQL;
+};

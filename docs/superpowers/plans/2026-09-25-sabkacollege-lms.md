@@ -715,15 +715,15 @@ git commit -m "feat: add admin course management"
 
 - [ ] **Step 1: Define dashboard data types and tests**
 
-Test that the dashboard includes only paid courses, selects the most recently active incomplete lesson for Continue Learning, falls back to the first incomplete lesson when no recent activity exists, and returns zero progress for a course with no completed lessons.
+Test that the dashboard progress query includes only the current user's lessons in courses with matching paid purchases. Verify Continue Learning selects the most recently active incomplete lesson, falls back to the first incomplete lesson when no recent activity exists, and returns `null` when no incomplete lesson exists. A paid course with no lessons remains incomplete, reports zero progress, and is not selected as a fallback.
 
 - [ ] **Step 2: Implement dashboard queries**
 
-Join paid purchases to courses, ordered modules, lessons, and the current user’s progress. Return only fields needed by the dashboard. Do not issue one query per course in a component; use a bounded set of aggregate queries.
+Join paid purchases to courses, ordered modules, lessons, and the current user's progress. Apply the same current-user paid-purchase boundary to the aggregate progress query so unrelated course progress cannot influence Continue Learning. Return only fields needed by the dashboard. Do not issue one query per course in a component; use a bounded set of aggregate queries.
 
 - [ ] **Step 3: Build the dashboard page**
 
-Show a welcome heading, overall progress, Continue Learning, and enrolled course cards. Link Continue Learning to the first incomplete lesson or the course learning home when all lessons are complete.
+Show a welcome heading, overall progress, Continue Learning, and enrolled course cards. Link Continue Learning to the most recently active incomplete lesson, or to the first incomplete lesson when no recent activity exists. Do not show a Continue Learning target when no incomplete lesson exists.
 
 - [ ] **Step 4: Verify access and rendering**
 

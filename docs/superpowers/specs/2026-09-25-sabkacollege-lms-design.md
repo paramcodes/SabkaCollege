@@ -123,6 +123,8 @@ src/
 
 The learning timeline is available on every lesson route so students can navigate without losing their place. Learning routes require a signed-in student with an active purchase/enrollment.
 
+The student dashboard reads only progress for the current user's lessons in courses with a matching paid purchase. Continue Learning selects the most recently active incomplete lesson, falls back to the first incomplete lesson when no recent activity exists, and has no target when no incomplete lesson exists. A paid course with no lessons remains incomplete, reports zero progress, and is not used as a fallback.
+
 ### Admin routes
 
 - `/admin` — admin overview

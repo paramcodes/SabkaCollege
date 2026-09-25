@@ -1,10 +1,16 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
+import StudentDashboardError from "../../../app/(student)/dashboard/error";
+import { ContinueLearning } from "../../../src/components/dashboards/continue-learning";
+import { CourseProgressCard } from "../../../src/components/dashboards/course-progress-card";
 import {
   studentDashboardCourseColumns,
   studentDashboardCourseWhere,
   studentDashboardProgressColumns,
+  studentDashboardProgressWhere,
 } from "../../../src/db/queries/query-boundaries";
 import { buildStudentDashboardData } from "../../../src/lib/student-dashboard";
 
@@ -55,6 +61,21 @@ describe("student dashboard data selection", () => {
     expect(studentDashboardCourseColumns).not.toHaveProperty("stripePriceId");
     expect(studentDashboardProgressColumns).not.toHaveProperty("userId");
     expect(studentDashboardProgressColumns).not.toHaveProperty("lessonProgressId");
+  });
+
+  it("limits dashboard progress to lessons in courses with a matching paid purchase", () => {
+    const compiled = compile(studentDashboardProgressWhere("user_server_123"));
+
+    expect(compiled.sql).toContain("lesson_progress.user_id = ");
+    expect(compiled.sql).toContain("lessons.id = lesson_progress.lesson_id");
+    expect(compiled.sql).toContain("modules.id = lessons.module_id");
+    expect(compiled.sql).toContain("courses.id = modules.course_id");
+    expect(compiled.sql).toContain("purchases.course_id = courses.id");
+    expect(compiled.sql).toContain("purchases.user_id = ");
+    expect(compiled.sql).toContain("purchases.status = ");
+    expect(compiled.params).toEqual(
+      expect.arrayContaining(["user_server_123", "user_server_123", "paid"]),
+    );
   });
 });
 
@@ -114,7 +135,7 @@ describe("student dashboard progress selection", () => {
     );
   });
 
-  it("links to the course learning home when every lesson is complete", () => {
+  it("returns no Continue Learning target when every lesson is complete", () => {
     const dashboard = buildStudentDashboardData(
       [course("complete-course", [
         { id: "complete-one", slug: "complete-one" },
@@ -135,6 +156,57 @@ describe("student dashboard progress selection", () => {
     );
 
     expect(dashboard.overallProgress).toBe(100);
-    expect(dashboard.continueLearning?.href).toBe("/learn/complete-course");
+    expect(dashboard.continueLearning).toBeNull();
+  });
+
+  it("keeps a paid course with no lessons incomplete and out of Continue Learning", () => {
+    const dashboard = buildStudentDashboardData(
+      [{ ...course("empty-course", []), modules: [] }],
+      [],
+    );
+
+    expect(dashboard.courses[0]).toMatchObject({
+      progressPercent: 0,
+      isComplete: false,
+      totalLessons: 0,
+    });
+    expect(dashboard.continueLearning).toBeNull();
+  });
+});
+
+describe("student dashboard semantics", () => {
+  it("renders each dashboard course title as an h3", () => {
+    const markup = renderToStaticMarkup(
+      createElement(CourseProgressCard, {
+        course: buildStudentDashboardData(
+          [course("semantic-course", [{ id: "lesson-one", slug: "lesson-one" }])],
+          [],
+        ).courses[0]!,
+      }),
+    );
+
+    expect(markup).toContain("<h3");
+    expect(markup).toContain("semantic-course course");
+  });
+
+  it("renders the Continue Learning title as an h2", () => {
+    const markup = renderToStaticMarkup(
+      createElement(ContinueLearning, { learning: null }),
+    );
+
+    expect(markup).toContain("<h2");
+    expect(markup).toContain("Your learning starts here");
+  });
+
+  it("announces the dashboard error state as an alert", () => {
+    const markup = renderToStaticMarkup(
+      createElement(StudentDashboardError, {
+        error: new Error("private database detail"),
+        reset: () => undefined,
+      }),
+    );
+
+    expect(markup).toContain('role="alert"');
+    expect(markup).not.toContain("private database detail");
   });
 });

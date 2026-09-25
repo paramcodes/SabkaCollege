@@ -10,10 +10,10 @@ import {
   type StudentDashboardData,
 } from "@/src/lib/student-dashboard";
 import {
-  progressForUserWhere,
   studentDashboardCourseColumns,
   studentDashboardCourseWhere,
   studentDashboardProgressColumns,
+  studentDashboardProgressWhere,
 } from "./query-boundaries";
 
 export type {
@@ -63,7 +63,7 @@ export async function getStudentDashboard(
     db
       .select(studentDashboardProgressColumns)
       .from(lessonProgress)
-      .where(progressForUserWhere(parsedUserId))
+      .where(studentDashboardProgressWhere(parsedUserId))
       .orderBy(desc(lessonProgress.updatedAt)),
   ]);
 

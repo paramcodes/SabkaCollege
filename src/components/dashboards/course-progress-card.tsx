@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import type { StudentDashboardCourse } from "@/src/lib/student-dashboard";
 import { Button } from "@/src/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/src/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/src/components/ui/card";
 
 export function CourseProgressCard({
   course,
@@ -31,14 +31,17 @@ export function CourseProgressCard({
             </span>
           ) : null}
         </div>
-        <CardTitle className="mt-3 font-serif text-2xl leading-tight tracking-[-0.025em]">
+        <h3
+          data-slot="card-title"
+          className="mt-3 font-serif text-2xl leading-tight tracking-[-0.025em]"
+        >
           <Link
             href={courseHref}
             className="rounded-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             {course.title}
           </Link>
-        </CardTitle>
+        </h3>
         <p className="mt-2 line-clamp-2 leading-6 text-muted-foreground">
           {course.shortDescription ?? "Continue your self-paced course."}
         </p>
