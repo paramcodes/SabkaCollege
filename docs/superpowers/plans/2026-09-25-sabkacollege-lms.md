@@ -715,7 +715,7 @@ git commit -m "feat: add admin course management"
 
 - [ ] **Step 1: Define dashboard data types and tests**
 
-Test that the dashboard includes only paid courses, selects the most recently active incomplete lesson for Continue Learning, and returns zero progress for a course with no completed lessons.
+Test that the dashboard includes only paid courses, selects the most recently active incomplete lesson for Continue Learning, falls back to the first incomplete lesson when no recent activity exists, and returns zero progress for a course with no completed lessons.
 
 - [ ] **Step 2: Implement dashboard queries**
 
