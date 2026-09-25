@@ -18,6 +18,9 @@ export const usersRelations = relations(users, ({ many }) => ({
 export const coursesRelations = relations(courses, ({ many }) => ({
   modules: many(modules),
   purchases: many(purchases),
+  // Course-level lessons are reached through modules: Drizzle's relational
+  // queries join declared column pairs only, so a direct course->lessons
+  // relation is not expressible.
 }));
 
 export const modulesRelations = relations(modules, ({ many, one }) => ({
@@ -63,6 +66,7 @@ export const lessonProgressRelations = relations(
 
 export const schema = {
   courses,
+  coursesRelations,
   lessonProgress,
   lessonProgressRelations,
   lessons,

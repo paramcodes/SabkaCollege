@@ -19,13 +19,20 @@ export const courses = pgTable(
   "courses",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    courseSlug: text("course_slug").notNull(),
+    slug: text("slug").notNull(),
     title: text("title").notNull(),
+    shortDescription: text("short_description"),
     description: text("description").notNull(),
-    status: courseStatusEnum("status").default("draft").notNull(),
-    priceCents: integer("price_cents").default(0).notNull(),
-    currency: text("currency").default("INR").notNull(),
     coverImageUrl: text("cover_image_url"),
+    status: courseStatusEnum("status").default("draft").notNull(),
+    /** Integer minor units (paise/cents) to avoid floating point money. */
+    priceAmount: integer("price_amount").default(0).notNull(),
+    currency: text("currency").default("INR").notNull(),
+    clerkProductId: text("clerk_product_id"),
+    clerkPriceId: text("clerk_price_id"),
+    estimatedDurationMinutes: integer("estimated_duration_minutes")
+      .default(0)
+      .notNull(),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
@@ -35,9 +42,14 @@ export const courses = pgTable(
       .notNull(),
   },
   (table) => [
-    uniqueIndex("courses_course_slug_uidx").on(table.courseSlug),
+    uniqueIndex("courses_slug_uidx").on(table.slug),
     index("courses_status_idx").on(table.status),
-    check("courses_price_cents_nonnegative", sql`${table.priceCents} >= 0`),
+    index("courses_clerk_price_id_idx").on(table.clerkPriceId),
+    check("courses_price_amount_nonnegative", sql`${table.priceAmount} >= 0`),
+    check(
+      "courses_estimated_duration_minutes_nonnegative",
+      sql`${table.estimatedDurationMinutes} >= 0`,
+    ),
   ],
 );
 
@@ -68,6 +80,22 @@ export const modules = pgTable(
   ],
 );
 
+/**
+ * External video hosting only. The MVP never ingests uploads, so a lesson
+ * stores which provider hosts it plus that provider's own reference.
+ */
+export const lessonVideoProvider = [
+  "youtube",
+  "vimeo",
+  "mux",
+  "cloudflare_stream",
+  "external",
+] as const;
+export const lessonVideoProviderEnum = pgEnum(
+  "lesson_video_provider",
+  lessonVideoProvider,
+);
+
 export const lessons = pgTable(
   "lessons",
   {
@@ -75,11 +103,13 @@ export const lessons = pgTable(
     moduleId: uuid("module_id")
       .notNull()
       .references(() => modules.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
     title: text("title").notNull(),
     description: text("description"),
     position: integer("position").notNull(),
-    type: text("type").default("video").notNull(),
-    videoUrl: text("video_url"),
+    videoProvider: lessonVideoProviderEnum("video_provider").notNull(),
+    /** Provider-specific asset ID or URL, resolved by the video adapter. */
+    videoReference: text("video_reference"),
     durationSeconds: integer("duration_seconds").default(0).notNull(),
     isPreview: boolean("is_preview").default(false).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -91,6 +121,7 @@ export const lessons = pgTable(
   },
   (table) => [
     index("lessons_module_id_idx").on(table.moduleId),
+    uniqueIndex("lessons_slug_uidx").on(table.slug),
     uniqueIndex("lessons_module_position_uidx").on(
       table.moduleId,
       table.position,
@@ -109,3 +140,5 @@ export type Module = typeof modules.$inferSelect;
 export type NewModule = typeof modules.$inferInsert;
 export type Lesson = typeof lessons.$inferSelect;
 export type NewLesson = typeof lessons.$inferInsert;
+export type CourseStatus = (typeof courseStatus)[number];
+export type LessonVideoProvider = (typeof lessonVideoProvider)[number];

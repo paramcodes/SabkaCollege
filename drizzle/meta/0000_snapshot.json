@@ -1,5 +1,5 @@
 {
-  "id": "3f0bb79f-2511-4e73-8adf-63261ca31215",
+  "id": "b1ed5576-0180-490c-bc03-989ba3759033",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -15,8 +15,8 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "course_slug": {
-          "name": "course_slug",
+        "slug": {
+          "name": "slug",
           "type": "text",
           "primaryKey": false,
           "notNull": true
@@ -27,11 +27,23 @@
           "primaryKey": false,
           "notNull": true
         },
+        "short_description": {
+          "name": "short_description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "description": {
           "name": "description",
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "cover_image_url": {
+          "name": "cover_image_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         },
         "status": {
           "name": "status",
@@ -41,8 +53,8 @@
           "notNull": true,
           "default": "'draft'"
         },
-        "price_cents": {
-          "name": "price_cents",
+        "price_amount": {
+          "name": "price_amount",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -55,11 +67,24 @@
           "notNull": true,
           "default": "'INR'"
         },
-        "cover_image_url": {
-          "name": "cover_image_url",
+        "clerk_product_id": {
+          "name": "clerk_product_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "clerk_price_id": {
+          "name": "clerk_price_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "estimated_duration_minutes": {
+          "name": "estimated_duration_minutes",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "published_at": {
           "name": "published_at",
@@ -83,11 +108,11 @@
         }
       },
       "indexes": {
-        "courses_course_slug_uidx": {
-          "name": "courses_course_slug_uidx",
+        "courses_slug_uidx": {
+          "name": "courses_slug_uidx",
           "columns": [
             {
-              "expression": "course_slug",
+              "expression": "slug",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -112,6 +137,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "courses_clerk_price_id_idx": {
+          "name": "courses_clerk_price_id_idx",
+          "columns": [
+            {
+              "expression": "clerk_price_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -119,9 +159,13 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "courses_price_cents_nonnegative": {
-          "name": "courses_price_cents_nonnegative",
-          "value": "\"courses\".\"price_cents\" >= 0"
+        "courses_price_amount_nonnegative": {
+          "name": "courses_price_amount_nonnegative",
+          "value": "\"courses\".\"price_amount\" >= 0"
+        },
+        "courses_estimated_duration_minutes_nonnegative": {
+          "name": "courses_estimated_duration_minutes_nonnegative",
+          "value": "\"courses\".\"estimated_duration_minutes\" >= 0"
         }
       },
       "isRLSEnabled": false
@@ -143,6 +187,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "title": {
           "name": "title",
           "type": "text",
@@ -161,15 +211,15 @@
           "primaryKey": false,
           "notNull": true
         },
-        "type": {
-          "name": "type",
-          "type": "text",
+        "video_provider": {
+          "name": "video_provider",
+          "type": "lesson_video_provider",
+          "typeSchema": "public",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'video'"
+          "notNull": true
         },
-        "video_url": {
-          "name": "video_url",
+        "video_reference": {
+          "name": "video_reference",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -215,6 +265,21 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "lessons_slug_uidx": {
+          "name": "lessons_slug_uidx",
+          "columns": [
+            {
+              "expression": "slug",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -398,7 +463,7 @@
         },
         "user_id": {
           "name": "user_id",
-          "type": "uuid",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -408,30 +473,30 @@
           "primaryKey": false,
           "notNull": true
         },
-        "playback_position_seconds": {
-          "name": "playback_position_seconds",
+        "last_position_seconds": {
+          "name": "last_position_seconds",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "default": 0
         },
-        "is_completed": {
-          "name": "is_completed",
-          "type": "boolean",
+        "max_watched_percentage": {
+          "name": "max_watched_percentage",
+          "type": "real",
           "primaryKey": false,
           "notNull": true,
-          "default": false
+          "default": 0
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "completion_method": {
           "name": "completion_method",
           "type": "completion_method",
           "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "completed_at": {
-          "name": "completed_at",
-          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
@@ -535,9 +600,13 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "lesson_progress_playback_position_nonnegative": {
-          "name": "lesson_progress_playback_position_nonnegative",
-          "value": "\"lesson_progress\".\"playback_position_seconds\" >= 0"
+        "lesson_progress_last_position_seconds_nonnegative": {
+          "name": "lesson_progress_last_position_seconds_nonnegative",
+          "value": "\"lesson_progress\".\"last_position_seconds\" >= 0"
+        },
+        "lesson_progress_max_watched_percentage_range": {
+          "name": "lesson_progress_max_watched_percentage_range",
+          "value": "\"lesson_progress\".\"max_watched_percentage\" >= 0 AND \"lesson_progress\".\"max_watched_percentage\" <= 1"
         }
       },
       "isRLSEnabled": false
@@ -561,7 +630,7 @@
         },
         "user_id": {
           "name": "user_id",
-          "type": "uuid",
+          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -571,8 +640,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "amount_cents": {
-          "name": "amount_cents",
+        "amount": {
+          "name": "amount",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
@@ -693,9 +762,9 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {
-        "purchases_amount_cents_nonnegative": {
-          "name": "purchases_amount_cents_nonnegative",
-          "value": "\"purchases\".\"amount_cents\" >= 0"
+        "purchases_amount_nonnegative": {
+          "name": "purchases_amount_nonnegative",
+          "value": "\"purchases\".\"amount\" >= 0"
         }
       },
       "isRLSEnabled": false
@@ -706,15 +775,8 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "clerk_user_id": {
-          "name": "clerk_user_id",
           "type": "text",
-          "primaryKey": false,
+          "primaryKey": true,
           "notNull": true
         },
         "email": {
@@ -723,23 +785,32 @@
           "primaryKey": false,
           "notNull": true
         },
-        "first_name": {
-          "name": "first_name",
+        "name": {
+          "name": "name",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "last_name": {
-          "name": "last_name",
+        "avatar_url": {
+          "name": "avatar_url",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "image_url": {
-          "name": "image_url",
-          "type": "text",
+        "role": {
+          "name": "role",
+          "type": "user_role",
+          "typeSchema": "public",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true,
+          "default": "'student'"
+        },
+        "last_synced_at": {
+          "name": "last_synced_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         },
         "created_at": {
           "name": "created_at",
@@ -757,17 +828,17 @@
         }
       },
       "indexes": {
-        "users_clerk_user_id_uidx": {
-          "name": "users_clerk_user_id_uidx",
+        "users_role_idx": {
+          "name": "users_role_idx",
           "columns": [
             {
-              "expression": "clerk_user_id",
+              "expression": "role",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             }
           ],
-          "isUnique": true,
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -791,6 +862,17 @@
         "archived"
       ]
     },
+    "public.lesson_video_provider": {
+      "name": "lesson_video_provider",
+      "schema": "public",
+      "values": [
+        "youtube",
+        "vimeo",
+        "mux",
+        "cloudflare_stream",
+        "external"
+      ]
+    },
     "public.completion_method": {
       "name": "completion_method",
       "schema": "public",
@@ -807,6 +889,14 @@
         "paid",
         "refunded",
         "revoked"
+      ]
+    },
+    "public.user_role": {
+      "name": "user_role",
+      "schema": "public",
+      "values": [
+        "student",
+        "admin"
       ]
     }
   },
