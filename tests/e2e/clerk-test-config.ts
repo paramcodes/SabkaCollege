@@ -27,10 +27,13 @@
  *   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_<real-test-tenant> \
  *   bunx playwright test tests/e2e/dashboard-access.spec.ts
  *
- * `playwright.config.ts` pins the placeholder key inside the `webServer`
- * command, so the exported keys must also be provided through the environment
- * for the redirect to be exercised. Live verification is tracked as a manual
- * check in `docs/guides/release-checklist.md`.
+ * `playwright.config.ts` resolves the opt-in before it starts the dev server:
+ * with `1` the `webServer` command passes only `CLERK_E2E_REAL_INSTANCE=1`, so
+ * the two real keys above are *inherited* from the runner's environment rather
+ * than replaced with placeholders, and a missing key fails the run immediately
+ * instead of measuring the wrong tenant. The keys are never interpolated into a
+ * command string, never printed, and never written to a file. Live verification
+ * is tracked as a manual check in `docs/guides/release-checklist.md`.
  */
 export const CLERK_E2E_REAL_INSTANCE = process.env.CLERK_E2E_REAL_INSTANCE === "1";
 

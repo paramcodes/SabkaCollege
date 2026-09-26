@@ -27,6 +27,66 @@ import { resolveSystemChrome } from "./scripts/system-chrome";
  * This affects the Playwright runner only. Vitest (`vitest.config.ts`) is a
  * separate process with its own config and never reads this file.
  */
+/**
+ * CLERK-E2E-REAL-INSTANCE OPT-IN
+ *
+ * The auth-redirect specs in `tests/e2e/clerk-test-config.ts` assert Clerk's
+ * own redirect behaviour. A placeholder key cannot honestly measure that, so
+ * they are gated on `CLERK_E2E_REAL_INSTANCE=1` and skip with a stated reason
+ * otherwise.
+ *
+ * The default is `0`, resolved once here and written back to
+ * `process.env` so the specs in `tests/e2e/clerk-test-config.ts` and the child
+ * dev server read the same normalized value. A value inherited from an
+ * earlier shell therefore cannot leave the suite un-gated against a tenant it
+ * is not pointed at.
+ *
+ * Two modes, and the two must not be mixed:
+ *
+ *   - Default (`0`): the dev server gets non-secret placeholder Clerk keys and
+ *     no `DATABASE_URL`. Nothing real is contacted.
+ *   - Opted in (`1`): the dev server **inherits** `CLERK_SECRET_KEY` and
+ *     `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` from this process instead of
+ *     receiving placeholders. Overriding them with placeholders would make the
+ *     gated tests run against the wrong tenant and report Clerk's behaviour as
+ *     this repository's. Missing keys are a configuration error and stop the
+ *     run here rather than half-way through a suite. Keys are read from the
+ *     environment and are never interpolated into the command string, never
+ *     printed, and never committed.
+ *
+ * `DATABASE_URL` stays unset in both modes, so no test can reach a live
+ * database.
+ */
+const useRealClerkInstance =
+  (process.env.CLERK_E2E_REAL_INSTANCE ?? "0") === "1";
+
+if (useRealClerkInstance) {
+  const missing = ["CLERK_SECRET_KEY", "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"].filter(
+    (name) => !process.env[name],
+  );
+
+  if (missing.length > 0) {
+    throw new Error(
+      `CLERK_E2E_REAL_INSTANCE=1 requires ${missing.join(" and ")} from a real ` +
+        "Clerk test tenant. Export them and re-run, or unset " +
+        "CLERK_E2E_REAL_INSTANCE to run the hermetic suite with placeholder keys. " +
+        "The keys are read from the environment and are never written to a file.",
+    );
+  }
+}
+
+const clerkAuthEnv = useRealClerkInstance
+  ? // Inherited, not re-declared: the real keys come from this process's
+    // environment, so no secret ever appears in a command line or a report.
+    "CLERK_E2E_REAL_INSTANCE=1"
+  : "CLERK_E2E_REAL_INSTANCE=0 CLERK_SECRET_KEY=sk_test_task7_placeholder " +
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_ZWxlbW9udGVzdC05MjMzMi5jbGVyay5hY2NvdW50cy5kZXYk";
+
+// The Playwright config is loaded by the runner process, and the specs run in
+// processes forked from it, so this is the one place the resolved opt-in
+// becomes visible to every reader.
+process.env.CLERK_E2E_REAL_INSTANCE = useRealClerkInstance ? "1" : "0";
+
 const systemChrome = resolveSystemChrome();
 
 export default defineConfig({
@@ -49,19 +109,11 @@ export default defineConfig({
     },
   ],
   webServer: {
-    // Placeholder, non-secret Clerk test keys and no `DATABASE_URL`, so the
-    // suite never depends on real credentials or a live database.
-    //
-    // `CLERK_E2E_REAL_INSTANCE=0` is stated explicitly rather than left to the
-    // default in `tests/e2e/clerk-test-config.ts`, so the auth-redirect tests
-    // skip by visible configuration rather than by an inherited accident of
-    // the ambient environment. The placeholder publishable key below is still
-    // a syntactically valid Clerk *development* key that resolves to a real
-    // dev instance, so those tests would otherwise measure Clerk's behaviour
-    // instead of this repository's. Set `CLERK_E2E_REAL_INSTANCE=1` and a real
-    // Clerk test tenant to exercise them; see `docs/guides/release-checklist.md`.
-    command:
-      "env -u DATABASE_URL CLERK_E2E_REAL_INSTANCE=0 CLERK_SECRET_KEY=sk_test_task7_placeholder NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_ZWxlbW9udGVzdC05MjMzMi5jbGVyay5hY2NvdW50cy5kZXYk bun run dev -- --hostname 127.0.0.1",
+    // No `DATABASE_URL` in either mode, so the suite never depends on a live
+    // database. The Clerk values are the conditional `clerkAuthEnv` above:
+    // placeholders for the hermetic default, inherited real values when a
+    // person opts in with `CLERK_E2E_REAL_INSTANCE=1`.
+    command: `env -u DATABASE_URL ${clerkAuthEnv} bun run dev -- --hostname 127.0.0.1`,
     url: "http://127.0.0.1:3000/sign-in",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

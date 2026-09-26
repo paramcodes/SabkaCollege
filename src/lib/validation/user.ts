@@ -8,6 +8,12 @@ export type ClerkUserIdentity = {
   name: string | null;
   avatarUrl: string | null;
   publicMetadata: Record<string, unknown>;
+  /**
+   * Set by the server-only sync layer when the user's email is in
+   * `CLERK_INITIAL_ADMIN_EMAILS`. It is a bootstrap for the first admins, not
+   * a role store: Clerk public metadata stays authoritative otherwise.
+   */
+  isInitialAdmin?: boolean;
 };
 
 export type AppUserSyncValues = Pick<
@@ -24,6 +30,36 @@ export type AppUserSyncValues = Pick<
 export const normalizeUserRole = (value: unknown): UserRole =>
   value === "admin" ? "admin" : "student";
 
+export const normalizeUserEmail = (value: string): string =>
+  value.trim().toLowerCase();
+
+/**
+ * Parse the comma-separated `CLERK_INITIAL_ADMIN_EMAILS` allow-list. An unset
+ * or empty value yields an empty set, so a deployment that never configures the
+ * variable promotes nobody. The value is read from the server-only sync layer,
+ * never from a `NEXT_PUBLIC_` variable.
+ */
+export const parseInitialAdminEmails = (
+  value: string | undefined,
+): ReadonlySet<string> =>
+  new Set(
+    (value ?? "")
+      .split(",")
+      .map(normalizeUserEmail)
+      .filter((email) => email.length > 0),
+  );
+
+/**
+ * Clerk public metadata is authoritative. The initial-admin allow-list only
+ * promotes, so a listed email is an admin and every other user takes the role
+ * Clerk reports.
+ */
+export const resolveUserRole = (
+  publicMetadata: Record<string, unknown>,
+  isInitialAdmin: boolean,
+): UserRole =>
+  isInitialAdmin ? "admin" : normalizeUserRole(publicMetadata.role);
+
 export const buildAppUserSyncValues = (
   identity: ClerkUserIdentity,
   syncedAt = new Date(),
@@ -32,7 +68,7 @@ export const buildAppUserSyncValues = (
   email: identity.email,
   name: identity.name,
   avatarUrl: identity.avatarUrl,
-  role: normalizeUserRole(identity.publicMetadata.role),
+  role: resolveUserRole(identity.publicMetadata, identity.isInitialAdmin === true),
   lastSyncedAt: syncedAt,
   updatedAt: syncedAt,
 });

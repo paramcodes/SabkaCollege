@@ -31,7 +31,7 @@ into a pass.
 | 2 | Stripe webhook URL and signing secret | PENDING — no production Stripe account |
 | 3 | Neon production database and migrations | PENDING — no production database |
 | 4 | Seed policy on production | PENDING — no production database |
-| 5 | Playwright smoke tests on the system browser | PENDING locally — needs a live host |
+| 5 | Playwright smoke tests on the system browser | PENDING — hermetic specs pass; auth-redirect specs skip by design |
 | 6 | Reduced-motion behaviour | PENDING — needs manual browser inspection |
 | 7 | Screenshot regeneration | PENDING — needs a capture run on the release commit |
 | 8 | Live purchase, refund, and dispute behaviour | PENDING — needs real checkout |
@@ -73,7 +73,11 @@ invisible to CI.
       publishable key with a test secret key fails in a way that looks like a
       network fault.
 - [ ] Confirm `CLERK_INITIAL_ADMIN_EMAILS` names the real first admins, and that
-      at least one of them exists in Clerk.
+      at least one of them exists in Clerk. This is a **local bootstrap**: it
+      promotes a listed address to `admin` at every sync, so a listed user is
+      `admin` even if Clerk metadata says `student`. Clerk public metadata stays
+      authoritative for everyone not on the list, and removing an address does
+      not revoke access on its own — change the metadata too.
 - [ ] Sign out in a private window, visit a protected route such as
       `/dashboard`, and confirm the redirect lands on the deployed sign-in page
       and returns to the original route after sign-in.
@@ -165,8 +169,12 @@ database is reachable, current, or correct.
 - [ ] Confirm the schema matches the application: `users`, `courses`, `modules`,
       `lessons`, `purchases`, and progress tables all exist with the expected
       columns and constraints.
-- [ ] Confirm `EXTERNAL_VIDEO_ALLOWED_HOSTS` includes the video host actually in
-      use, or every lesson embed fails closed.
+- [ ] Confirm `EXTERNAL_VIDEO_ALLOWED_HOSTS` (server) and
+      `NEXT_PUBLIC_EXTERNAL_VIDEO_ALLOWED_HOSTS` (browser) include the video
+      host actually in use, or every `external` lesson embed fails closed. The
+      effective allow-list is the union of both variables and the built-in
+      provider hosts, so an unset variable is not automatically a blocker for
+      YouTube, Vimeo, or Mux references.
 - [ ] Confirm automated backups and point-in-time recovery are enabled on the
       production branch, and that a restore has been tested at least once.
 
@@ -244,19 +252,49 @@ with an explicit reason instead of reporting a pass they did not earn.
       "authentication boundaries" block in `error-states.spec.ts` are skipped
       with the `CLERK_E2E_REAL_INSTANCE` reason. They assert Clerk's own
       redirect behaviour, which the harness placeholder key cannot honestly
-      measure.
+      measure. **The default run skips them.** That is the intended default,
+      not a broken gate, and it is the honest outcome on a machine with no real
+      Clerk test tenant.
 - [ ] Confirm the public, no-database, and error-state tests **did run** and
       **did pass**. A run where everything skipped is a broken gate, not a
       green one.
-- [ ] Exercise the auth-redirect boundary for real instead, using a real Clerk
-      test tenant:
 
-      ```bash
-      CLERK_E2E_REAL_INSTANCE=1 \
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_<real-test-tenant> \
-      CLERK_SECRET_KEY=sk_test_<real-test-tenant> \
-      bunx playwright test
-      ```
+#### Running the gated auth-redirect tests for real
+
+This is the opt-in, and it is off unless you turn it on:
+
+| Input | Default | What it does |
+| --- | --- | --- |
+| `CLERK_E2E_REAL_INSTANCE` | `0` | `1` makes the dev server **inherit** the two real keys below instead of receiving placeholders. |
+| `CLERK_SECRET_KEY` | placeholder | Must be a real **test-tenant** secret key when opted in. |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | placeholder | Must be the matching real test-tenant publishable key when opted in. |
+
+```bash
+CLERK_E2E_REAL_INSTANCE=1 \
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_<real-test-tenant> \
+CLERK_SECRET_KEY=sk_test_<real-test-tenant> \
+bunx playwright test
+```
+
+Behaviour, so there is no ambiguity about what a run meant:
+
+- With `CLERK_E2E_REAL_INSTANCE` unset or `0`, the dev server starts with
+  placeholder keys and **no** `DATABASE_URL`. The auth-redirect tests skip with
+  a stated reason; nothing real is contacted.
+- With `CLERK_E2E_REAL_INSTANCE=1`, the two keys are **inherited from your
+  environment**, not re-declared in the dev-server command. A run with `1` and
+  a missing key fails immediately with an error naming the key. That is
+  deliberate: overriding a real key with a placeholder would run the gated
+  tests against the wrong tenant and report Clerk's behaviour as this
+  repository's.
+- The keys are read from the environment. They are never interpolated into the
+  command string, never printed, and never committed.
+- `DATABASE_URL` stays unset in **both** modes, so no test reaches a live
+  database even in the opted-in run.
+
+**Do not report the auth-redirect tests as passed unless you actually ran them
+this way.** An unrun or skipped gate is a skip; recording it as a pass is the
+one failure this checklist exists to prevent.
 
 - [ ] Against the deployed host, walk the smoke path in a real browser: land on
       the home page, open the catalogue, open a published course, attempt a
@@ -272,18 +310,23 @@ and interactive *without* animation. An automated opacity or visibility
 assertion would pass on the animated path too, so it cannot distinguish the two.
 This needs eyes on the page.
 
-`src/components/motion/reduced-motion-provider.tsx` subscribes to
-`(prefers-reduced-motion: reduce)` via `useSyncExternalStore`.
+`src/components/motion/reduced-motion-provider.tsx` reads
+`(prefers-reduced-motion: reduce)` through `useSyncExternalStore` and
+**subscribes to the media query's `change` event**, so the preference is
+tracked live rather than snapshotted once.
 `src/components/motion/reveal.tsx` and `src/components/motion/hero-motion.tsx`
 both return early when the preference is set, so the animated GSAP timelines
-never start.
+never start. Because the update is a subscription rather than a one-shot read,
+a page loaded with motion enabled and then reduced must also settle correctly
+without a reload — and a page loaded with motion already reduced must not start
+its timelines when the preference is later turned off.
 
 ### Steps
 
 - [ ] Enable **Settings → Accessibility → Reduce motion** in the OS (macOS),
       the GNOME accessibility panel, or the Chrome DevTools
-      **Rendering → Emulate CSS media feature** option. Reload; the setting is
-      read at load, not live.
+      **Rendering → Emulate CSS media feature** option. If you enable it *before*
+      loading the page, you are testing the load-time path.
 - [ ] Load the landing page. Confirm all hero, section, and card content is
       visible. No element may be left at `opacity: 0`, `y: 18`, or any other
       pre-animation state.
@@ -293,9 +336,16 @@ never start.
       buttons, and accordions all respond.
 - [ ] Check the same pages with motion enabled. Confirm the animation still
       runs, so the fix has not simply disabled the effect for everyone.
-- [ ] Confirm the change is live: toggle the preference without a full reload
-      and confirm the page updates, since the provider subscribes to media-query
-      changes rather than reading the value once.
+- [ ] Confirm the change is live rather than load-time only: with the page
+      already open, toggle the OS/DevTools preference **without reloading** and
+      confirm the page responds — the provider subscribes to the media query's
+      `change` event, so a late change must be picked up rather than requiring a
+      refresh. Test both directions (enable → disable and disable → enable) on
+      the same loaded page.
+- [ ] Confirm no content is stranded mid-transition when the preference flips
+      while a reveal is still pending: a page must not end up with a permanently
+      hidden section because an animation was interrupted rather than
+      completed.
 - [ ] Confirm the lesson video player also behaves: autoplay and animated
       transitions must not fight the preference.
 

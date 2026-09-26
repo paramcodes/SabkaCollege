@@ -35,15 +35,47 @@ empty or placeholder values.
 | `CLERK_SECRET_KEY` | server | Clerk backend API key. |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | browser | Clerk frontend key. Shipped to every visitor. |
 | `CLERK_WEBHOOK_SIGNING_SECRET` | server | Verifies `POST /api/webhooks/clerk`. |
-| `CLERK_INITIAL_ADMIN_EMAILS` | server | Comma-separated allow-list promoted to `admin` at user-sync time. |
+| `CLERK_INITIAL_ADMIN_EMAILS` | server | Comma-separated, email addresses promoted to `admin` at user-sync time. A **local bootstrap only** — see below. Unset or empty promotes nobody. |
 | `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | browser | Defaults to `/sign-in`. |
 | `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | browser | Defaults to `/sign-up`. |
 | `STRIPE_SECRET_KEY` | server | Stripe API key. |
 | `STRIPE_WEBHOOK_SECRET` | server | Verifies `POST /api/webhooks/stripe`. |
 | `NEXT_PUBLIC_APP_URL` | browser | Absolute origin used to build Stripe redirect URLs. Must match the registered webhook host. |
+| `EXTERNAL_VIDEO_ALLOWED_HOSTS` | server | Comma-separated extra hostnames an `external` lesson may embed. Not a secret; the server reads it so a client cannot widen the list. |
+| `NEXT_PUBLIC_EXTERNAL_VIDEO_ALLOWED_HOSTS` | browser | Same list, for the browser half. The effective allow-list is the union of this, the server value, and the built-in provider hosts (`www.youtube-nocookie.com`, `player.vimeo.com`, `stream.mux.com`). An `external` lesson whose host is not on that list fails closed and renders no player. |
 
 Anything prefixed `NEXT_PUBLIC_` is delivered to every browser. A secret behind
 that prefix is a published secret.
+
+### `CLERK_INITIAL_ADMIN_EMAILS` is a bootstrap, not a role store
+
+The variable is read only on the server, by the user-sync layer
+(`src/lib/auth/user-sync.ts`). It is never prefixed with `NEXT_PUBLIC_`,
+never serialized into a response, and never reaches the browser. Comparison is
+on the trimmed, lower-cased address, so `Owner@Example.com` and
+`owner@example.com` are the same entry.
+
+What it does: when a listed address is synced, that user is written as
+`admin`. It only ever **promotes** — an address that is not listed takes the
+role Clerk reports, so listing someone can never demote an existing admin.
+
+What it is not: it is not the long-term source of truth for roles. **Clerk
+public metadata remains authoritative for every account that is not on the
+list.** Once an account exists, the durable way to promote or demote it is
+`publicMetadata: { role: "admin" | "student" }` in Clerk; the next sync writes
+that value into `users.role`. The allow-list exists to get the very first
+admins in before any metadata has been set, and a listed address keeps
+`admin` on every sync — that is how a bootstrap avoids being clobbered by
+still-empty metadata.
+
+Two consequences worth stating plainly:
+
+- A listed address is written as `admin` even if Clerk metadata says
+  `student`. The list promotes; it never demotes anyone who is not listed.
+- Removing an address from the list does **not** revoke admin by itself. The
+  next sync writes whatever Clerk metadata says. If that metadata still says
+  `admin`, the user stays an admin; only after the metadata is changed does the
+  removal take effect. To revoke access, set the Clerk metadata first.
 
 ### Clerk
 
@@ -55,9 +87,10 @@ that prefix is a published secret.
 3. Sign-in and sign-up are served by the catch-all Clerk routes at
    `/sign-in` and `/sign-up`.
 4. Roles live in Clerk **public metadata** as `{ "role": "admin" | "student" }`.
-   Granting admin means editing Clerk metadata, never writing `users.role`
-   directly — the next sync overwrites it. `CLERK_INITIAL_ADMIN_EMAILS`
-   bootstraps the first admins.
+   That is the long-term source of truth. Granting or revoking admin means
+   editing Clerk metadata, never writing `users.role` directly — the next sync
+   overwrites it. `CLERK_INITIAL_ADMIN_EMAILS` is a local bootstrap for the
+   first admins, described below.
 5. Register `https://<your-host>/api/webhooks/clerk` and set
    `CLERK_WEBHOOK_SIGNING_SECRET` from that endpoint's signing secret.
 
@@ -194,11 +227,22 @@ this repository's, and are gated on `CLERK_E2E_REAL_INSTANCE`, which
 
 On a default run those tests **skip with a stated reason**. The public,
 no-database, and error-state tests still run and still assert real behaviour.
-To exercise the redirects you need a real Clerk test tenant and its keys:
+To exercise the redirects you need a real Clerk test tenant and its keys.
+`CLERK_E2E_REAL_INSTANCE=1` makes `playwright.config.ts` **inherit** the two
+keys from your environment instead of injecting the placeholders; a run with
+`1` and a missing key stops immediately with an error rather than starting a
+suite that would measure the wrong tenant:
 
 ```bash
-CLERK_E2E_REAL_INSTANCE=1 bunx playwright test tests/e2e/dashboard-access.spec.ts
+CLERK_E2E_REAL_INSTANCE=1 \
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_<real-test-tenant> \
+CLERK_SECRET_KEY=sk_test_<real-test-tenant> \
+bunx playwright test tests/e2e/dashboard-access.spec.ts
 ```
+
+The keys are read from the environment. They are never interpolated into the
+dev-server command, never printed, and never written to a file. In this mode
+`DATABASE_URL` is still unset, so no test can reach a live database.
 
 Live redirect verification is a manual acceptance check in
 [`docs/guides/release-checklist.md`](docs/guides/release-checklist.md). Do not

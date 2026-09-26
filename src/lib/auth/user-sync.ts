@@ -13,6 +13,8 @@ import {
   buildAppUserTombstoneValues,
   getRequiredEmail,
   getRequiredUserId,
+  normalizeUserEmail,
+  parseInitialAdminEmails,
   type AppUser,
   type AppUserSyncValues,
 } from "@/src/lib/validation/user";
@@ -21,6 +23,18 @@ const joinName = (firstName: string | null, lastName: string | null) => {
   const name = [firstName, lastName].filter(Boolean).join(" ").trim();
   return name || null;
 };
+
+/**
+ * `CLERK_INITIAL_ADMIN_EMAILS` is a bootstrap for the very first admins, not a
+ * role store. Reading it here keeps the value server-only: it is never
+ * prefixed with `NEXT_PUBLIC_`, never serialized into a response, and never
+ * reaches the browser. For anything after the first sign-in, Clerk public
+ * metadata is the source of truth — see `docs/guides/authentication-and-billing.md`.
+ */
+const isInitialAdminEmail = (email: string): boolean =>
+  parseInitialAdminEmails(process.env.CLERK_INITIAL_ADMIN_EMAILS).has(
+    normalizeUserEmail(email),
+  );
 
 const upsertAppUser = async (
   values: AppUserSyncValues,
@@ -43,16 +57,18 @@ const upsertAppUser = async (
 };
 
 export const syncCurrentClerkUser = async (user: User): Promise<AppUser> => {
-  const email =
-    user.primaryEmailAddress?.emailAddress ?? user.emailAddresses[0]?.emailAddress;
+  const email = getRequiredEmail(
+    user.primaryEmailAddress?.emailAddress ?? user.emailAddresses[0]?.emailAddress,
+  );
 
   return upsertAppUser(
     buildAppUserSyncValues({
       id: getRequiredUserId(user.id),
-      email: getRequiredEmail(email),
+      email,
       name: user.fullName ?? joinName(user.firstName, user.lastName),
       avatarUrl: user.imageUrl || null,
       publicMetadata: user.publicMetadata,
+      isInitialAdmin: isInitialAdminEmail(email),
     }),
   );
 };
@@ -70,13 +86,16 @@ export const syncClerkUser = async (event: UserWebhookEvent): Promise<void> => {
       (email) => email.id === event.data.primary_email_address_id,
     ) ?? event.data.email_addresses[0];
 
+  const email = getRequiredEmail(primaryEmail?.email_address);
+
   await upsertAppUser(
     buildAppUserSyncValues({
       id: getRequiredUserId(event.data.id),
-      email: getRequiredEmail(primaryEmail?.email_address),
+      email,
       name: joinName(event.data.first_name, event.data.last_name),
       avatarUrl: event.data.image_url || null,
       publicMetadata: event.data.public_metadata,
+      isInitialAdmin: isInitialAdminEmail(email),
     }),
   );
 };
