@@ -75,9 +75,10 @@ invisible to CI.
 - [ ] Confirm `CLERK_INITIAL_ADMIN_EMAILS` names the real first admins, and that
       at least one of them exists in Clerk. An explicit Clerk
       `publicMetadata.role` of `admin` or `student` always wins; the env list only
-      bootstraps users who have no explicit role. To demote an admin, change their
-      Clerk public metadata — removing the email from the env list alone does not
-      revoke access.
+      bootstraps users who have no explicit role. Removing an email from the env
+      list does not revoke access: a bootstrap user with no explicit Clerk role
+      simply falls back to `student` on the next sync. To demote a user whose Clerk
+      metadata explicitly says `admin`, change the Clerk public metadata itself.
 - [ ] Sign out in a private window, visit a protected route such as
       `/dashboard`, and confirm the redirect lands on the deployed sign-in page
       and returns to the original route after sign-in.
