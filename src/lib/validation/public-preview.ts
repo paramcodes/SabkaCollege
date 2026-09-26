@@ -20,8 +20,9 @@ export type PublicEmbed = {
 /**
  * The public preview renders third-party frames, so it stays more locked down
  * than the signed-in player: no `allow-same-origin` on a frame we do not
- * control, and no referrer for hosts that are not one of the well-known
- * providers.
+ * control, and `no-referrer` on every `external` reference — including
+ * configured well-known hosts, which are allow-listed by origin but are still
+ * third parties.
  */
 const iframeDefaults = {
   sandbox: "allow-scripts allow-same-origin allow-presentation",

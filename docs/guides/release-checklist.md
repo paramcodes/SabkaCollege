@@ -73,11 +73,11 @@ invisible to CI.
       publishable key with a test secret key fails in a way that looks like a
       network fault.
 - [ ] Confirm `CLERK_INITIAL_ADMIN_EMAILS` names the real first admins, and that
-      at least one of them exists in Clerk. This is a **local bootstrap**: it
-      promotes a listed address to `admin` at every sync, so a listed user is
-      `admin` even if Clerk metadata says `student`. Clerk public metadata stays
-      authoritative for everyone not on the list, and removing an address does
-      not revoke access on its own — change the metadata too.
+      at least one of them exists in Clerk. An explicit Clerk
+      `publicMetadata.role` of `admin` or `student` always wins; the env list only
+      bootstraps users who have no explicit role. To demote an admin, change their
+      Clerk public metadata — removing the email from the env list alone does not
+      revoke access.
 - [ ] Sign out in a private window, visit a protected route such as
       `/dashboard`, and confirm the redirect lands on the deployed sign-in page
       and returns to the original route after sign-in.
@@ -461,7 +461,7 @@ the release plan; record each one separately.
       but approximate: it is a floor for "reached the end region", not evidence
       of comprehension. Do not build grading, certificates, or time-spent
       reporting on this column without replacing it. See
-      [architecture](#the-video-progress-metric).
+      [architecture](architecture.md#the-video-progress-metric).
 - [ ] Confirm the refund and dispute paths never leave a half-written purchase
       row: each event either applies fully or rolls back.
 

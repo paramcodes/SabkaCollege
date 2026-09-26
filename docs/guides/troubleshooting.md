@@ -77,9 +77,12 @@ Check `DATABASE_URL`, and check the Clerk user has a primary email —
 `getRequiredEmail` rejects an account with no email address.
 
 **A user is admin in Clerk but `/admin` redirects to sign-in.**
-The mirror has not synced. Confirm the email is in `CLERK_INITIAL_ADMIN_EMAILS`
-if the grant must survive a full resync, then reload so the request re-syncs.
-Never write `users.role` directly; the next sync overwrites it.
+The mirror has not synced, so reload to let the request re-sync. The grant must
+live in Clerk `publicMetadata.role` — that is what survives a full resync.
+`CLERK_INITIAL_ADMIN_EMAILS` is a bootstrap fallback that applies only to
+users whose Clerk metadata carries no `role`; an explicit role in Clerk always
+wins, so adding the email to the list will not restore a demoted admin. Never
+write `users.role` directly; the next sync overwrites it.
 
 **A protected route renders instead of redirecting.**
 The prefix is missing from the `matcher` in `proxy.ts`, or the layout guard is
