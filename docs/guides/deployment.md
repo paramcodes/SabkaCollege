@@ -57,7 +57,7 @@ to review, not something the build should do silently.
 ## Environment variables
 
 See the full table in
-[authentication and billing](authentication-and-billing.md). Classify them:
+[authentication and billing](#authentication-and-billing). Classify them:
 
 | Scope | Variables |
 | --- | --- |
@@ -123,7 +123,9 @@ makes Clerk retry an event you will never act on.
 ## Documentation screenshots
 
 `scripts/capture-docs-screenshots.ts` produces the images under
-`docs/screenshots/`. It is a documentation tool, not a test, and it has no
+`docs/screenshots/`. The five public screenshots are mirrored into
+`public/docs/screenshots/`, so the running app serves them at
+`/docs/screenshots/<file>.png`. It is a documentation tool, not a test, and it has no
 command-line flags. The only inputs are the environment variables the browser
 resolver reads.
 
@@ -286,6 +288,6 @@ failed navigation, or a page that rendered without its expected heading.
 
 ## Next
 
-- [Authentication and billing](authentication-and-billing.md)
-- [Page map](page-map.md)
-- [Troubleshooting](troubleshooting.md)
+- [Authentication and billing](#authentication-and-billing)
+- [Page map](#page-map)
+- [Troubleshooting](#troubleshooting)

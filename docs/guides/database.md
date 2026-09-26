@@ -265,6 +265,6 @@ not the constraint.
 
 ## Next
 
-- [Authentication and billing](authentication-and-billing.md)
-- [Adding a course](adding-a-course.md)
-- [Troubleshooting](troubleshooting.md)
+- [Authentication and billing](#authentication-and-billing)
+- [Adding a course](#adding-a-course)
+- [Troubleshooting](#troubleshooting)

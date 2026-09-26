@@ -40,6 +40,18 @@ const ARTIFACT_DIRECTORY = path.resolve(
   "test-results/screenshots",
 );
 
+/**
+ * The capture tests need more than Playwright's 30s default. `/docs` renders
+ * all nine guides in full, so its `fullPage` screenshot is roughly 48,000px
+ * tall and takes tens of seconds to encode, and on a cold `next dev` the
+ * route is compiled on first request. The 30s default was exceeded with the
+ * PNG already written, so the timeout was raised to the same order of
+ * magnitude as `bun run screenshots:capture`'s own server/boot budget rather
+ * than weakening any assertion. The other four pages finish in a few seconds
+ * each and are unaffected by the larger ceiling.
+ */
+const CAPTURE_TIMEOUT_MS = 180_000;
+
 /** The pages that must render publicly, with the text that proves a real render. */
 const PUBLIC_PAGES = [
   { name: "landing", route: "/", expected: "Learn with SabkaCollege" },
@@ -56,6 +68,8 @@ test.describe("documentation screenshots", () => {
 
   for (const page of PUBLIC_PAGES) {
     test(`captures ${page.name} from ${page.route}`, async ({ page: browserPage }) => {
+      test.setTimeout(CAPTURE_TIMEOUT_MS);
+
       const response = await browserPage.goto(page.route, { waitUntil: "load" });
 
       expect(response, `${page.route} returned no response`).not.toBeNull();

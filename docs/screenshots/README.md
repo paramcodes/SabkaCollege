@@ -18,7 +18,7 @@ bun run screenshots:capture
 | `pricing-page.png` | `/pricing` | 1440 x 3102 | The pay-once pricing page, including the "Pay once. Keep your course access." headline. |
 | `courses-page.png` | `/courses` | 1440 x 1327 | **The no-database empty state**, not real catalogue data. See the caveat below. |
 | `blog-page.png` | `/blog` | 1440 x 1761 | The blog index, listing the two published articles from `docs/blog/`. |
-| `docs-page.png` | `/docs` | 1440 x 47906 | The full documentation index — every guide in `docs/guides/` rendered. It is a tall page because the index renders all ten guides in full. |
+| `docs-page.png` | `/docs` | 1440 x 47906 | The full documentation index — every guide in `docs/guides/` rendered. It is a tall page because the index renders all nine guides in full. |
 
 `report.json` is written by the same run and is the machine-readable record of
 what was captured, from which route, and what was skipped and why. When you
@@ -132,11 +132,18 @@ The test resolves its output directory from `process.cwd()`
 under Playwright's own Node-based test registry — that would have resolved every
 screenshot to `<cwd>/undefined/...`.
 
+## The `public/docs/screenshots` mirror
+
+The five captured PNGs are copied verbatim into `public/docs/screenshots/` so
+the running app can serve them at `/docs/screenshots/<file>.png`. `docs/screenshots/`
+is the reviewed source of truth; the mirror is what a reader actually loads in a
+guide. Keep the two in sync when the set is regenerated.
+
 Verify everything with:
 
 ```bash
 bun run typecheck
 bun run lint
-bun test
+bun run test
 bunx playwright test tests/e2e/screenshots.spec.ts
 ```

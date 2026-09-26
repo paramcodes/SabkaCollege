@@ -97,7 +97,6 @@ for it:
 | `/admin` | Needs a signed-in Clerk session and an admin role |
 | `/sign-in`, `/sign-up` | Clerk-hosted screens render third-party UI and need a real tenant |
 | `/courses/[courseSlug]`, `/courses/[courseSlug]/preview/[lessonSlug]` | Need a live database row for a published course and lesson |
-| `/learn/[courseSlug]`, `/learn/[courseSlug]/[lessonSlug]` | Need a signed-in student with a paid purchase |
 
 A route that fails to render is also reported rather than captured: a non-2xx
 response, a failed navigation, or a missing expected heading marks the target
@@ -105,8 +104,12 @@ response, a failed navigation, or a missing expected heading marks the target
 
 Both lists are written to the machine-readable
 `docs/screenshots/report.json`, which is the only machine-written file
-alongside the PNGs. The run writes no `README.md`; `docs/screenshots/README.md`
-is maintained by hand from that report. See [deployment](deployment.md) for the
+alongside the PNGs. The table of never-captured routes above matches that report
+exactly; no route is listed here that the report does not record as `skipped`.
+
+The five public screenshots are also mirrored into `public/docs/screenshots/`
+so the running app serves them at `/docs/screenshots/<file>.png`. The run writes no `README.md`; `docs/screenshots/README.md`
+is maintained by hand from that report. See [deployment](#deployment) for the
 browser requirement, the command, and how the honest states are described.
 
 ## Safe-change steps
@@ -160,7 +163,7 @@ same pattern but they are independent.
 
 ## Next
 
-- [Architecture](architecture.md)
-- [Adding a course](adding-a-course.md)
-- [Deployment](deployment.md)
-- [Troubleshooting](troubleshooting.md)
+- [Architecture](#architecture)
+- [Adding a course](#adding-a-course)
+- [Deployment](#deployment)
+- [Troubleshooting](#troubleshooting)

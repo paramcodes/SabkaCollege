@@ -289,6 +289,6 @@ in `src/actions/admin-courses.ts`.
 
 ## Next
 
-- [Database](database.md)
-- [Components](components.md)
-- [Troubleshooting](troubleshooting.md)
+- [Database](#database)
+- [Components](#components)
+- [Troubleshooting](#troubleshooting)

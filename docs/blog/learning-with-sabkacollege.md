@@ -53,7 +53,7 @@ What that gives you:
 
 A preview lesson is a real lesson from the real course, not a separate
 marketing asset. It is stored with the course, served from the same data, and
-rendered with the same player.
+rendered with the same provider-specific safe player.
 
 That means what you watch in a preview is exactly what you will get. It also
 means a preview cannot be a bait-and-switch: there is no way for the public

@@ -37,7 +37,7 @@ version for you if you have it enabled.
 | `next.config.ts` | `cacheComponents: true`; the only Next config |
 | `vitest.config.ts` | Unit test include glob and the `@` alias |
 | `playwright.config.ts` | E2E test dir, dev server command, browser project |
-| `bunfig.toml` | Excludes `tests/e2e/**` from `bun test` |
+| `bunfig.toml` | Excludes `tests/e2e/**` from the unit test run |
 | `drizzle.config.ts` | Points drizzle-kit at `src/db/schema/index.ts` |
 | `.env.example` | The full list of environment variable names |
 | `proxy.ts` | Clerk middleware and the protected route matcher |
@@ -52,9 +52,11 @@ There is no data flow yet, and that is the point. The starting state is:
 3. `(marketing)/page.tsx` renders static content from
    `src/lib/content/landing.ts`.
 
-No route reads the database yet, so the app runs without `DATABASE_URL`. This is
-why the landing page and the catalogue degrade to explicit "temporarily
-unavailable" states instead of crashing.
+The public catalogue routes check `process.env.DATABASE_URL` before touching the
+database and degrade to an explicit "temporarily unavailable" state instead of
+crashing, but `src/db/index.ts` throws at module load when the variable is
+missing. A **development `DATABASE_URL` is therefore required** for the dev
+server, the test suite, and `bun run build`.
 
 ## Safe-change steps
 
@@ -78,7 +80,7 @@ Fill in `DATABASE_URL`, `CLERK_SECRET_KEY`, and
 `.gitignore` — confirm with `git status` before you commit anything else.
 
 You can work on the marketing surface with no secrets at all, because nothing
-in `(marketing)` touches Clerk or Postgres. See [deployment](deployment.md) for
+in `(marketing)` touches Clerk or Postgres. See [deployment](#deployment) for
 the full variable list.
 
 ### Start the dev server
@@ -87,8 +89,20 @@ the full variable list.
 bun run dev
 ```
 
-Then open <http://localhost:3000>. See [the landing
-screenshot](/docs) for what a healthy first page looks like.
+Then open <http://localhost:3000>.
+
+## Screenshots
+
+| View | Image |
+| --- | --- |
+| SabkaCollege landing page | ![SabkaCollege landing page](/docs/screenshots/landing-page.png) |
+| Course catalogue | ![Course catalogue](/docs/screenshots/courses-page.png) |
+| Teammate guides | ![Teammate guides](/docs/screenshots/docs-page.png) |
+
+These five public screenshots are served from `/docs/screenshots/...` — the
+repository keeps a `docs/guides/` set for review and a mirrored copy under
+`public/docs/screenshots/` so the app can serve them. The nine guides in
+`docs/guides/` are all rendered on the docs index.
 
 ### Run the quality suite before you edit anything
 
@@ -108,7 +122,7 @@ and fix or report it — do not start work on a broken baseline.
 bun run test
 
 # One file
-bun test tests/unit/auth/roles.test.ts
+bun run test -- tests/unit/auth/roles.test.ts
 
 # Types
 bun run typecheck
@@ -123,10 +137,9 @@ DATABASE_URL="postgres://user:pass@host/db?sslmode=require" bun run build
 bunx playwright test
 ```
 
-`bun test` is not the same as `bun run test`. `bun test` runs Bun's own test
-runner, which is what you want for a single file because it is fast. `bun run
-test` runs Vitest, which is the project suite. `bunfig.toml` keeps
-`tests/e2e/**` out of both.
+`bun run test` is the project suite (Vitest). To run one file, pass it after
+`--`: `bun run test -- tests/unit/auth/roles.test.ts`. `bunfig.toml` keeps
+`tests/e2e/**` out of the unit run.
 
 ## Troubleshooting
 
@@ -155,6 +168,6 @@ installed.
 
 ## Next
 
-- [Architecture](architecture.md) — how the route groups and layers fit together
-- [Page map](page-map.md) — every route and what it requires
-- [Database](database.md) — schema, migrations, and the query layer
+- [Architecture](#architecture) — how the route groups and layers fit together
+- [Page map](#page-map) — every route and what it requires
+- [Database](#database) — schema, migrations, and the query layer

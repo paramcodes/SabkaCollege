@@ -196,6 +196,6 @@ and add a unit test.
 
 ## Next
 
-- [Architecture](architecture.md)
-- [Adding a course](adding-a-course.md)
-- [Troubleshooting](troubleshooting.md)
+- [Architecture](#architecture)
+- [Adding a course](#adding-a-course)
+- [Troubleshooting](#troubleshooting)

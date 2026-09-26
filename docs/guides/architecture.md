@@ -204,8 +204,8 @@ component and pass a plain object.
 
 ## Next
 
-- [Page map](page-map.md)
-- [Database](database.md)
-- [Authentication and billing](authentication-and-billing.md)
-- [Components](components.md)
-- [Troubleshooting](troubleshooting.md)
+- [Page map](#page-map)
+- [Database](#database)
+- [Authentication and billing](#authentication-and-billing)
+- [Components](#components)
+- [Troubleshooting](#troubleshooting)

@@ -22,27 +22,91 @@ const HTML_ESCAPES: Record<string, string> = {
 export const escapeHtml = (value: string): string =>
   value.replace(/[&<>"']/g, (character) => HTML_ESCAPES[character] ?? character);
 
-const ABSOLUTE_HTTPS_URL = /^https:\/\/[^\s<>"']+$/;
+const ABSOLUTE_HTTPS_URL = /^https:\/\/[^\s<>"'\\]+$/;
 const IN_PAGE_ANCHOR = /^#[A-Za-z][A-Za-z0-9_-]*$/;
+
+/** C0 controls, DEL, and the backslash that some user agents read as `/`. */
+const UNSAFE_HREF_CHARACTER = /[\\\u0000-\u001f\u007f]/;
+
+/** `%2e`, `%2f`, and `%5c` decode to `.`, `/`, and `\`. */
+const ENCODED_PATH_SEPARATOR = /%2e|%2f|%5c/i;
+
+/**
+ * A site-absolute path is safe when it is not protocol relative and no path
+ * segment is a traversal. Matching whole segments rather than a bare `..`
+ * substring keeps `/v1.2..3` legal while still rejecting `/a/../../etc`.
+ */
+const isSafeSiteAbsolutePath = (value: string): boolean => {
+  if (value.startsWith("//") || ENCODED_PATH_SEPARATOR.test(value)) {
+    return false;
+  }
+
+  return !value.split("/").some((segment) => segment === "..");
+};
 
 /**
  * Allows site-absolute paths without traversal, in-page anchors, and
  * `https://` URLs. Everything else — `javascript:`, `data:`, protocol
- * relative `//host`, `http://`, and relative paths containing `..` — is
- * rejected and rendered as plain text.
+ * relative `//host`, `http://`, backslashes, control characters, and
+ * percent-encoded separators — is rejected and rendered as plain text.
  */
 export const safeHref = (href: string): string | null => {
   const value = href.trim();
+
+  if (value === "" || UNSAFE_HREF_CHARACTER.test(value)) {
+    return null;
+  }
 
   if (IN_PAGE_ANCHOR.test(value)) {
     return value;
   }
 
-  if (value.startsWith("/") && !value.startsWith("//")) {
-    return value.includes("..") ? null : value;
+  if (value.startsWith("/")) {
+    return isSafeSiteAbsolutePath(value) ? value : null;
   }
 
   return ABSOLUTE_HTTPS_URL.test(value) ? value : null;
+};
+
+/**
+ * Anchor-safe base id for a heading: lowercase, hyphen separated, and always
+ * starting with a letter so it satisfies `IN_PAGE_ANCHOR`. An id that would
+ * start with a digit — or a heading of nothing but punctuation — is prefixed
+ * or replaced rather than dropped, so every heading stays linkable.
+ */
+const HEADING_INLINE_LINK = /!?\[([^\]]*)\]\([^)]*\)/g;
+const UNSLUGGABLE_HEADING = "section";
+
+const headingIdBase = (text: string): string => {
+  const base = text
+    .replace(HEADING_INLINE_LINK, "$1")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  if (base === "") {
+    return UNSLUGGABLE_HEADING;
+  }
+
+  return /^[0-9]/.test(base) ? `${UNSLUGGABLE_HEADING}-${base}` : base;
+};
+
+/**
+ * Hands out ids that are unique within one document. A repeated base keeps
+ * its name and gains a `-2`, `-3`, … suffix, so the ids a reader can see stay
+ * stable as long as the text above them does not change.
+ */
+const createHeadingIdAllocator = (): ((text: string) => string) => {
+  const used = new Map<string, number>();
+
+  return (text: string) => {
+    const base = headingIdBase(text);
+    const seen = used.get(base) ?? 0;
+
+    used.set(base, seen + 1);
+
+    return seen === 0 ? base : `${base}-${seen}`;
+  };
 };
 
 const renderInline = (raw: string): string => {
@@ -132,13 +196,15 @@ const renderList = (
 /**
  * Renders Markdown to a safe HTML fragment.
  *
- * Supported: ATX headings, paragraphs, fenced code blocks, blockquotes,
- * unordered and ordered lists, thematic breaks, in-page anchors, `https://`
- * links, safe images, and inline code/bold/italic/strikethrough.
+ * Supported: ATX headings (each with a unique `id`), paragraphs, fenced code
+ * blocks, blockquotes, unordered and ordered lists, thematic breaks, in-page
+ * anchors, `https://` links, safe images, and inline code/bold/italic/
+ * strikethrough.
  */
 export const renderMarkdown = (source: string): string => {
   const lines = source.replace(/\r\n/g, "\n").split("\n");
   const output: string[] = [];
+  const nextHeadingId = createHeadingIdAllocator();
   let index = 0;
 
   while (index < lines.length) {
@@ -174,8 +240,9 @@ export const renderMarkdown = (source: string): string => {
 
     if (heading) {
       const level = (heading[1] as string).length;
-      const content = renderInline((heading[2] ?? "").trim());
-      output.push(`<h${level}>${content}</h${level}>`);
+      const text = (heading[2] ?? "").trim();
+      const content = renderInline(text);
+      output.push(`<h${level} id="${escapeHtml(nextHeadingId(text))}">${content}</h${level}>`);
       index += 1;
       continue;
     }

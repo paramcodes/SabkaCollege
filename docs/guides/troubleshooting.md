@@ -24,7 +24,7 @@ import. For a one-off build, pass it on the command line:
 **A cache directive error during `next build`.**
 Read the directive named in the message. `"use cache: private"` cannot be
 stacked with `"use cache"`, and neither works in a non-async function. Details
-in [architecture](architecture.md).
+in [architecture](#architecture).
 
 **A prerender error about dynamic data in a static route.**
 Something in the static path reads `cookies()`, `headers()`, or `searchParams`.
@@ -158,8 +158,10 @@ re-save.
 ## Tests
 
 **`bun test` and `bun run test` give different results.**
-`bun test` is Bun's own runner and is fast for a single file. `bun run test` is
-Vitest, the project suite. `bunfig.toml` excludes `tests/e2e/**` from both.
+`bun run test` is the project suite (Vitest) and is the command to use. `bun
+test` is Bun's own runner and can silently skip the Vitest configuration. To run
+a single file, pass it after `--`: `bun run test -- tests/unit/auth/roles.test.ts`.
+`bunfig.toml` excludes `tests/e2e/**`.
 
 **A Playwright test fails to launch a browser.**
 Playwright's bundled Chromium may not be downloaded. The `chromium` project in
@@ -208,7 +210,7 @@ the process, not the shell.
 
 ## Next
 
-- [Architecture](architecture.md)
-- [Database](database.md)
-- [Components](components.md)
-- [Deployment](deployment.md)
+- [Architecture](#architecture)
+- [Database](#database)
+- [Components](#components)
+- [Deployment](#deployment)

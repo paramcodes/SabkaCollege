@@ -249,6 +249,6 @@ Stripe dashboard; do not disable verification.
 
 ## Next
 
-- [Database](database.md)
-- [Adding a course](adding-a-course.md)
-- [Deployment](deployment.md)
+- [Database](#database)
+- [Adding a course](#adding-a-course)
+- [Deployment](#deployment)

@@ -8,8 +8,9 @@ tags: ["getting-started", "students"]
 ---
 
 SabkaCollege sells individual self-paced courses. There is no subscription, no
-bundle tier, and no feature gate. You buy one course once, and that purchase
-gives you access to every published lesson in it.
+bundle tier. You buy one course once, and that purchase gives you a **paid
+entitlement** to the lessons in it. Non-preview lessons require that paid
+entitlement; only preview lessons are open to everyone.
 
 This post walks the whole path in the order you will actually move through it.
 
@@ -29,7 +30,7 @@ you are looking at.
 Every course has two public pages before you pay for anything.
 
 - The **overview** at `/courses/<course-slug>` explains the course in full and
-  shows the first module's lessons.
+  shows the course outcomes plus links to the preview lessons.
 - The **syllabus** at `/courses/<course-slug>/syllabus` lists every module and
   lesson in order, with the duration of each one.
 
