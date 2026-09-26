@@ -1,0 +1,50 @@
+{
+  "generator": "scripts/capture-docs-screenshots.ts",
+  "baseURL": "http://127.0.0.1:3010",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "deviceScaleFactor": 1,
+  "captured": [
+    {
+      "file": "landing-page.png",
+      "route": "/"
+    },
+    {
+      "file": "pricing-page.png",
+      "route": "/pricing"
+    },
+    {
+      "file": "courses-page.png",
+      "route": "/courses",
+      "note": "captured the no-database empty state, not real catalogue data"
+    },
+    {
+      "file": "blog-page.png",
+      "route": "/blog"
+    },
+    {
+      "file": "docs-page.png",
+      "route": "/docs"
+    }
+  ],
+  "skipped": [
+    {
+      "route": "/dashboard",
+      "reason": "requires a signed-in Clerk session; no authenticated screenshot is fabricated"
+    },
+    {
+      "route": "/admin",
+      "reason": "requires a signed-in Clerk session and an admin role"
+    },
+    {
+      "route": "/sign-in, /sign-up",
+      "reason": "Clerk-hosted auth screens render third-party UI and need a real tenant"
+    },
+    {
+      "route": "/courses/[slug], /courses/[slug]/preview/[lesson]",
+      "reason": "needs a live database row for a published course and lesson"
+    }
+  ]
+}
