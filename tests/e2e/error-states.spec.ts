@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
 
+import {
+  CLERK_E2E_REAL_INSTANCE,
+  CLERK_E2E_REAL_INSTANCE_SKIP_REASON,
+} from "./clerk-test-config";
+
 /**
  * Error and unavailable-state coverage for the public route boundaries.
  *
@@ -18,6 +23,12 @@ import { expect, test } from "@playwright/test";
  *   (loader returns `not-found`) cannot be reached in this environment. That
  *   assertion is gated on a real seeded E2E database rather than faked with a
  *   mocked module, which would only prove the mock works.
+ * - The three cases in the "authentication boundaries" block assert Clerk's
+ *   signed-out redirect shape, which needs a real Clerk test tenant rather
+ *   than the placeholder key. Only those three are gated on
+ *   `CLERK_E2E_REAL_INSTANCE`; every other case in this file runs. See
+ *   `./clerk-test-config.ts` and the live-check list in
+ *   `docs/guides/release-checklist.md`.
  */
 
 const sensitivePattern =
@@ -105,6 +116,13 @@ test.describe("safe unavailable state (no DATABASE_URL)", () => {
 });
 
 test.describe("authentication boundaries", () => {
+  // Clerk's signed-out redirect shape is only observable against a real Clerk
+  // test tenant. The harness placeholder key resolves to a Clerk dev instance,
+  // so these three are skipped with a stated reason rather than reported as a
+  // pass they did not earn. Verification is a manual live check; see
+  // `docs/guides/release-checklist.md`.
+  test.skip(!CLERK_E2E_REAL_INSTANCE, CLERK_E2E_REAL_INSTANCE_SKIP_REASON);
+
   test("an unauthenticated learning request reaches a sign-in state, not a server error", async ({
     page,
   }) => {

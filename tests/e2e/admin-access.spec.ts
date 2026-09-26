@@ -1,5 +1,19 @@
 import { expect, test } from "@playwright/test";
 
+import {
+  CLERK_E2E_REAL_INSTANCE,
+  CLERK_E2E_REAL_INSTANCE_SKIP_REASON,
+} from "./clerk-test-config";
+
+/**
+ * Every test in this file asserts Clerk's own signed-out redirect shape
+ * (`/sign-in?redirect_url=...`). That is only observable against a real Clerk
+ * instance, and the harness supplies a placeholder key. See
+ * `./clerk-test-config.ts`; live verification is a manual check in
+ * `docs/guides/release-checklist.md`.
+ */
+test.skip(!CLERK_E2E_REAL_INSTANCE, CLERK_E2E_REAL_INSTANCE_SKIP_REASON);
+
 const adminRoutes = [
   "/admin",
   "/admin/courses",

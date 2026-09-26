@@ -150,7 +150,7 @@ describe("project scripts", () => {
 Run:
 
 ```bash
-bun test tests/unit/smoke/app-config.test.ts
+bun run test -- tests/unit/smoke/app-config.test.ts
 bun run typecheck
 bun run lint
 ```
@@ -226,7 +226,7 @@ Assert the token file contains the approved accent, background, foreground, prim
 - [ ] **Step 5: Verify and commit**
 
 ```bash
-bun test tests/unit/styles/design-tokens.test.ts
+bun run test -- tests/unit/styles/design-tokens.test.ts
 bun run typecheck
 bun run lint
 git add app/globals.css app/layout.tsx src/styles src/components/ui src/components/motion tests/unit/styles
@@ -302,7 +302,7 @@ Run:
 ```bash
 bun run db:generate
 bun run typecheck
-bun test tests/unit/db/schema-contract.test.ts
+bun run test -- tests/unit/db/schema-contract.test.ts
 ```
 
 If a real `DATABASE_URL` is available, run `bun run db:migrate` against a development database. Otherwise keep the generated migration and document the required local command without pretending migration execution occurred.
@@ -371,7 +371,7 @@ Verify the Clerk webhook signature with the raw request body. Handle user create
 - [ ] **Step 5: Run tests and typecheck**
 
 ```bash
-bun test tests/unit/auth
+bun run test -- tests/unit/auth
 bun run typecheck
 bun run lint
 ```
@@ -445,7 +445,7 @@ Keep these helpers free of database and Clerk imports so they can be tested with
 - [ ] **Step 5: Run unit tests**
 
 ```bash
-bun test tests/unit/validation tests/unit/utils
+bun run test -- tests/unit/validation tests/unit/utils
 bun run typecheck
 ```
 
@@ -508,7 +508,7 @@ Verify the raw body with `STRIPE_WEBHOOK_SECRET` before parsing. Map checkout/pa
 
 ```bash
 bun run db:generate
-bun test tests/unit/billing tests/unit/db
+bun run test -- tests/unit/billing tests/unit/db
 bun run typecheck
 bun run lint
 bun run build
@@ -624,7 +624,8 @@ Render the complete module/lesson outline. Show lock icons for non-preview lesso
 - [ ] **Step 5: Verify catalog and course routes**
 
 ```bash
-bun test tests/unit/catalog tests/e2e/catalog.spec.ts
+bun run test -- tests/unit/catalog
+bunx playwright test tests/e2e/catalog.spec.ts
 bun run typecheck
 bun run lint
 ```
@@ -683,7 +684,8 @@ Render only server-provided user and purchase fields. Add pagination to purchase
 - [ ] **Step 6: Verify admin boundaries**
 
 ```bash
-bun test tests/unit/admin tests/e2e/admin-access.spec.ts
+bun run test -- tests/unit/admin
+bunx playwright test tests/e2e/admin-access.spec.ts
 bun run typecheck
 bun run lint
 ```
@@ -728,7 +730,8 @@ Show a welcome heading, overall progress, Continue Learning, and enrolled course
 - [ ] **Step 4: Verify access and rendering**
 
 ```bash
-bun test tests/unit/dashboards tests/e2e/dashboard-access.spec.ts
+bun run test -- tests/unit/dashboards
+bunx playwright test tests/e2e/dashboard-access.spec.ts
 bun run typecheck
 bun run lint
 ```
@@ -787,7 +790,8 @@ Validate user, course, lesson, position, and watched percentage server-side. Ups
 - [ ] **Step 6: Verify learning behavior**
 
 ```bash
-bun test tests/unit/video tests/e2e/learning-access.spec.ts
+bun run test -- tests/unit/video
+bunx playwright test tests/e2e/learning-access.spec.ts
 bun run typecheck
 bun run lint
 ```
@@ -899,7 +903,7 @@ Use fixed viewports and deterministic seed data. Capture `landing-page.png`, `co
 - [ ] **Step 5: Verify content and capture flow**
 
 ```bash
-bun test tests/unit/content
+bun run test -- tests/unit/content
 bunx playwright test tests/e2e/screenshots.spec.ts
 bun run typecheck
 bun run lint
@@ -939,7 +943,7 @@ The checklist must cover Clerk production origins, Stripe webhook URL and signin
 ```bash
 bun run lint
 bun run typecheck
-bun test
+bun run test
 bun run build
 bunx playwright test
 ```

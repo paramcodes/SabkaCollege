@@ -51,8 +51,17 @@ export default defineConfig({
   webServer: {
     // Placeholder, non-secret Clerk test keys and no `DATABASE_URL`, so the
     // suite never depends on real credentials or a live database.
+    //
+    // `CLERK_E2E_REAL_INSTANCE=0` is stated explicitly rather than left to the
+    // default in `tests/e2e/clerk-test-config.ts`, so the auth-redirect tests
+    // skip by visible configuration rather than by an inherited accident of
+    // the ambient environment. The placeholder publishable key below is still
+    // a syntactically valid Clerk *development* key that resolves to a real
+    // dev instance, so those tests would otherwise measure Clerk's behaviour
+    // instead of this repository's. Set `CLERK_E2E_REAL_INSTANCE=1` and a real
+    // Clerk test tenant to exercise them; see `docs/guides/release-checklist.md`.
     command:
-      "env -u DATABASE_URL CLERK_SECRET_KEY=sk_test_task7_placeholder NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_ZWxlbW9udGVzdC05MjMzMi5jbGVyay5hY2NvdW50cy5kZXYk bun run dev -- --hostname 127.0.0.1",
+      "env -u DATABASE_URL CLERK_E2E_REAL_INSTANCE=0 CLERK_SECRET_KEY=sk_test_task7_placeholder NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_ZWxlbW9udGVzdC05MjMzMi5jbGVyay5hY2NvdW50cy5kZXYk bun run dev -- --hostname 127.0.0.1",
     url: "http://127.0.0.1:3000/sign-in",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
