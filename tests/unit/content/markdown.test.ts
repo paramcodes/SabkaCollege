@@ -1,3 +1,7 @@
+import { readFileSync, readdirSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 import { escapeHtml, renderMarkdown, safeHref } from "../../../src/lib/content/markdown";
@@ -156,6 +160,105 @@ describe("renderMarkdown heading ids", () => {
     for (const id of headingIds(renderMarkdown("# 1. Intro\n\n# !!!\n"))) {
       expect(safeHref(`#${id}`)).toBe(`#${id}`);
     }
+  });
+});
+
+describe("renderMarkdown idPrefix", () => {
+  it("namespaces every heading id with the prefix", () => {
+    expect(
+      headingIds(renderMarkdown("# Notes\n\n## Local setup\n", { idPrefix: "database" })),
+    ).toEqual(["database-notes", "database-local-setup"]);
+  });
+
+  it("emits unprefixed ids when no prefix is given", () => {
+    expect(headingIds(renderMarkdown("## Local setup\n"))).toEqual(["local-setup"]);
+  });
+
+  it("counts repeats inside a document, not across prefixes", () => {
+    expect(headingIds(renderMarkdown("# Notes\n\n# Notes\n", { idPrefix: "a" }))).toEqual([
+      "a-notes",
+      "a-notes-1",
+    ]);
+    expect(headingIds(renderMarkdown("# Notes\n", { idPrefix: "b" }))).toEqual(["b-notes"]);
+  });
+
+  it("slugs the prefix so it cannot inject anything into the attribute", () => {
+    expect(headingIds(renderMarkdown("# Notes\n", { idPrefix: 'Da"ta Base!!' }))).toEqual([
+      "da-ta-base-notes",
+    ]);
+  });
+
+  it("falls back to a safe prefix when the given one is unsluggable", () => {
+    expect(headingIds(renderMarkdown("# Notes\n", { idPrefix: "!!!" }))).toEqual([
+      "section-notes",
+    ]);
+  });
+
+  it("emits prefixed ids that safeHref still accepts", () => {
+    for (const id of headingIds(renderMarkdown("# 1. Intro\n", { idPrefix: "database" }))) {
+      expect(safeHref(`#${id}`)).toBe(`#${id}`);
+    }
+  });
+});
+
+/**
+ * The `/docs` route renders every guide into one document, each inside an
+ * `article` whose own `id` is the bare slug. Without an `idPrefix` the two
+ * heading id namespaces overlap, so the ids a reader can link to are only
+ * unique per guide, not per page. This test reads the guides that actually
+ * ship and asserts the whole page has one flat, duplicate-free id space.
+ */
+describe("the guides rendered onto the single /docs page", () => {
+  const guidesDirectory = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "../../../docs/guides",
+  );
+
+  const shippedGuides = readdirSync(guidesDirectory)
+    .filter((name) => name.endsWith(".md"))
+    .sort((left, right) => left.localeCompare(right, "en"))
+    .map((name) => ({
+      slug: name.replace(/\.md$/, ""),
+      body: readFileSync(path.join(guidesDirectory, name), "utf8").replace(
+        /^---\n[\s\S]*?\n---\n/,
+        "",
+      ),
+    }));
+
+  it("has at least one guide on disk", () => {
+    expect(shippedGuides.length).toBeGreaterThan(0);
+  });
+
+  it("gives every heading id a unique value across the whole page", () => {
+    const ids = shippedGuides.flatMap((guide) =>
+      headingIds(renderMarkdown(guide.body, { idPrefix: guide.slug })),
+    );
+
+    expect(ids.length).toBeGreaterThan(0);
+    expect(ids).toEqual([...new Set(ids)]);
+  });
+
+  it("never lets a prefixed heading id shadow a guide's top-level anchor", () => {
+    const articleAnchors = shippedGuides.map((guide) => guide.slug);
+    const headingIdList = shippedGuides.flatMap((guide) =>
+      headingIds(renderMarkdown(guide.body, { idPrefix: guide.slug })),
+    );
+
+    expect(headingIdList.filter((id) => articleAnchors.includes(id))).toEqual([]);
+  });
+
+  it("keeps every prefixed id reachable through an in-page anchor", () => {
+    for (const guide of shippedGuides) {
+      for (const id of headingIds(renderMarkdown(guide.body, { idPrefix: guide.slug }))) {
+        expect(safeHref(`#${id}`)).toBe(`#${id}`);
+      }
+    }
+  });
+
+  it("would collide without the prefix, which is why the prefix is required", () => {
+    const unprefixed = shippedGuides.flatMap((guide) => headingIds(renderMarkdown(guide.body)));
+
+    expect(unprefixed.length).toBeGreaterThan(new Set(unprefixed).size);
   });
 });
 

@@ -12,18 +12,49 @@ bun run screenshots:capture
 
 ## What is in this directory
 
-| File | Route | Size | What it shows |
-| --- | --- | --- | --- |
-| `landing-page.png` | `/` | 1440 x 5746 | The marketing landing page — hero, value props, and the call to action. |
-| `pricing-page.png` | `/pricing` | 1440 x 3102 | The pay-once pricing page, including the "Pay once. Keep your course access." headline. |
-| `courses-page.png` | `/courses` | 1440 x 1327 | **The no-database empty state**, not real catalogue data. See the caveat below. |
-| `blog-page.png` | `/blog` | 1440 x 1761 | The blog index, listing the two published articles from `docs/blog/`. |
-| `docs-page.png` | `/docs` | 1440 x 47906 | The full documentation index — every guide in `docs/guides/` rendered. It is a tall page because the index renders all nine guides in full. |
+| File | Route | Size (px) | Size on disk | What it shows |
+| --- | --- | --- | --- | --- |
+| `landing-page.png` | `/` | 1440 x 5746 | 557,820 B | The marketing landing page — hero, value props, and the call to action. |
+| `pricing-page.png` | `/pricing` | 1440 x 3102 | 288,669 B | The pay-once pricing page, including the "Pay once. Keep your course access." headline. |
+| `courses-page.png` | `/courses` | 1440 x 1327 | 106,711 B | **The no-database empty state**, not real catalogue data. See the caveat below. |
+| `blog-page.png` | `/blog` | 1440 x 1761 | 151,028 B | The blog index, listing the two published articles from `docs/blog/`. |
+| `docs-page.png` | `/docs` | 1440 x 49994 | 7,940,352 B | The full documentation index — every guide in `docs/guides/` rendered. It is a tall page because the index renders all nine guides in full. |
+
+Those numbers are from the run that produced the files currently in the
+directory, not from an earlier run. Re-measure after every regeneration; a
+changed `docs-page.png` height means the rendered `/docs` page changed, which is
+usually a content or heading change rather than noise.
 
 `report.json` is written by the same run and is the machine-readable record of
 what was captured, from which route, and what was skipped and why. When you
 regenerate the screenshots, regenerate the report in the same run — never edit
-it by hand.
+it by hand. A run in which nothing changed legitimately rewrites `report.json`
+byte-for-byte identically; that is the honest outcome, not a missing update.
+
+## The `/docs` anchor contract
+
+`/docs` renders all nine guides into one document, so heading ids have to be
+namespaced or they repeat across guides:
+
+- each `<article>` keeps the **bare guide slug** as its `id`, so
+  `#database`, `#deployment`, and every cross-guide link written as `[Database](#database)`
+  keep working;
+- every heading **inside** a guide is namespaced with the guide slug as a
+  prefix, so a "## Database" heading inside `getting-started.md` becomes
+  `id="getting-started-database"` rather than a second `id="database"` that
+  would shadow the guide anchor above it.
+
+The prefix is applied by `renderMarkdown(source, { idPrefix })` and threaded
+through the `<Prose idPrefix>` component. A prefix is slugged with the same rules
+as heading text, so it cannot inject anything into the `id` attribute, and an
+unsluggable prefix falls back to `section-` rather than silently turning
+namespacing off.
+
+All 35 in-page anchor links across the nine shipped guides resolve under this
+contract, because every one of them targets a guide-level anchor, not a heading
+inside a guide. `tests/unit/content/markdown.test.ts` pins both facts: the
+whole page has a duplicate-free id space with the prefix, and would collide
+without it.
 
 ## How the capture works
 

@@ -54,6 +54,12 @@ export const metadata: Metadata = {
  * `getGuidesWithContent` throws `ContentValidationError` when frontmatter is
  * invalid or two guides share a slug, so a broken file fails the build instead
  * of rendering a half-empty page.
+ *
+ * Anchor contract: each guide owns an unprefixed `id` equal to its slug, so
+ * `#database` and the cross-guide links inside the Markdown keep working.
+ * Every heading *inside* a guide is rendered with the guide slug as an
+ * `idPrefix`, because all nine guides share this one document and unprefixed
+ * heading ids would otherwise repeat across them.
  */
 export default async function DocsPage() {
   const guides = inReadingOrder(await getGuidesWithContent());
@@ -151,7 +157,10 @@ export default async function DocsPage() {
               </header>
 
               <div className="mt-6">
-                <Prose markdown={guide.body} />
+                <Prose
+                  markdown={guide.body}
+                  idPrefix={guide.frontmatter.slug}
+                />
               </div>
             </article>
           ))}

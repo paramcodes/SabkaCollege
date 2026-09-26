@@ -91,13 +91,44 @@ const headingIdBase = (text: string): string => {
   return /^[0-9]/.test(base) ? `${UNSLUGGABLE_HEADING}-${base}` : base;
 };
 
+/** Options for {@link renderMarkdown}. */
+export type RenderOptions = {
+  /**
+   * Optional namespace for heading ids, e.g. the slug of the document this
+   * fragment belongs to. Every id becomes `<idPrefix>-<base>`, so several
+   * documents rendered into one page cannot hand out the same id.
+   */
+  readonly idPrefix?: string;
+};
+
+/**
+ * Normalises a caller-supplied `idPrefix` with the same rules a heading text
+ * goes through, so a prefix can never introduce a character that is not legal
+ * in an anchor. An empty or unsluggable prefix falls back to `section` rather
+ * than silently disabling namespacing.
+ */
+const normalizeIdPrefix = (idPrefix: string | undefined): string => {
+  if (idPrefix === undefined) {
+    return "";
+  }
+
+  return headingIdBase(idPrefix);
+};
+
 /**
  * Hands out ids that are unique within one document. A repeated base keeps
  * its name and gains a `-2`, `-3`, … suffix, so the ids a reader can see stay
  * stable as long as the text above them does not change.
+ *
+ * The uniqueness counter is keyed on the *unprefixed* base, and the prefix is
+ * prepended to the finished id. Because the prefix is constant for one
+ * document, distinct bases still produce distinct ids.
  */
-const createHeadingIdAllocator = (): ((text: string) => string) => {
+const createHeadingIdAllocator = (
+  idPrefix: string,
+): ((text: string) => string) => {
   const used = new Map<string, number>();
+  const qualify = (id: string): string => (idPrefix === "" ? id : `${idPrefix}-${id}`);
 
   return (text: string) => {
     const base = headingIdBase(text);
@@ -105,7 +136,7 @@ const createHeadingIdAllocator = (): ((text: string) => string) => {
 
     used.set(base, seen + 1);
 
-    return seen === 0 ? base : `${base}-${seen}`;
+    return qualify(seen === 0 ? base : `${base}-${seen}`);
   };
 };
 
@@ -196,15 +227,18 @@ const renderList = (
 /**
  * Renders Markdown to a safe HTML fragment.
  *
- * Supported: ATX headings (each with a unique `id`), paragraphs, fenced code
- * blocks, blockquotes, unordered and ordered lists, thematic breaks, in-page
- * anchors, `https://` links, safe images, and inline code/bold/italic/
- * strikethrough.
+ * Supported: ATX headings (each with a unique `id`, namespaced by
+ * `options.idPrefix` when one is given), paragraphs, fenced code blocks,
+ * blockquotes, unordered and ordered lists, thematic breaks, in-page anchors,
+ * `https://` links, safe images, and inline code/bold/italic/strikethrough.
  */
-export const renderMarkdown = (source: string): string => {
+export const renderMarkdown = (
+  source: string,
+  options: RenderOptions = {},
+): string => {
   const lines = source.replace(/\r\n/g, "\n").split("\n");
   const output: string[] = [];
-  const nextHeadingId = createHeadingIdAllocator();
+  const nextHeadingId = createHeadingIdAllocator(normalizeIdPrefix(options.idPrefix));
   let index = 0;
 
   while (index < lines.length) {

@@ -26,11 +26,24 @@ const PROSE_CLASSES = [
   "[&_ul]:my-4 [&_ul]:list-disc [&_ul]:pl-6",
 ].join(" ");
 
-export function Prose({ markdown }: { markdown: string }) {
+export function Prose({
+  markdown,
+  idPrefix,
+}: {
+  markdown: string;
+  /**
+   * Optional namespace for the heading ids this fragment emits. Pass it when
+   * several documents are rendered into one page, so a heading id cannot
+   * repeat across them or shadow an ancestor's `id` anchor.
+   */
+  idPrefix?: string;
+}) {
   return (
     <div
       className={PROSE_CLASSES}
-      dangerouslySetInnerHTML={{ __html: renderMarkdown(markdown) }}
+      dangerouslySetInnerHTML={{
+        __html: renderMarkdown(markdown, { idPrefix }),
+      }}
     />
   );
 }
