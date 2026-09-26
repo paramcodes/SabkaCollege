@@ -19,7 +19,7 @@ The first release is a public platform with one initial admin. The architecture 
 - Course overview pages
 - Public syllabus/course-plan pages
 - Clerk authentication and role-based authorization
-- One-time course purchases through Clerk Billing
+- One-time course purchases through Stripe Checkout
 - Self-paced learning area with video player and timeline
 - Autosaved playback position
 - Automatic lesson completion at 90% watched plus manual completion
@@ -107,6 +107,7 @@ src/
 - `/courses` — course catalog
 - `/courses/[courseSlug]` — course overview and purchase CTA
 - `/courses/[courseSlug]/syllabus` — full public course plan
+- `/courses/[courseSlug]/preview/[lessonSlug]` — public preview lesson player
 - `/pricing` — purchase information and FAQ
 - `/blog` — blog index
 - `/blog/[slug]` — blog article
@@ -122,6 +123,8 @@ src/
 
 The learning timeline is available on every lesson route so students can navigate without losing their place. Learning routes require a signed-in student with an active purchase/enrollment.
 
+The student dashboard reads only progress for the current user's lessons in courses with a matching paid purchase. Continue Learning selects the most recently active incomplete lesson, falls back to the first incomplete lesson when no recent activity exists, and has no target when no incomplete lesson exists. A paid course with no lessons remains incomplete, reports zero progress, and is not used as a fallback.
+
 ### Admin routes
 
 - `/admin` — admin overview
@@ -135,7 +138,7 @@ Admin routes are protected by both UI-level navigation filtering and server-side
 
 ## 6. Data Model
 
-Clerk is the source of truth for identities, sessions, public role metadata, and billing transactions. The LMS database stores application-owned content, a synchronized user mirror, and learning state.
+Clerk is the source of truth for identities, sessions, and public role metadata. Stripe is the source of truth for payment transactions. The LMS database stores application-owned content, synchronized user and purchase mirrors, and learning state.
 
 ### `users`
 
@@ -159,8 +162,8 @@ Clerk is the source of truth for identities, sessions, public role metadata, and
 - `status` — `draft`, `published`, or `archived`
 - `priceAmount`
 - `currency`
-- `clerkProductId`
-- `clerkPriceId`
+- `stripeProductId`
+- `stripePriceId`
 - `estimatedDurationMinutes`
 - `createdAt`
 - `updatedAt`
@@ -193,7 +196,8 @@ Clerk is the source of truth for identities, sessions, public role metadata, and
 ### `purchases`
 
 - `id`
-- `clerkPurchaseId`
+- `stripeCheckoutSessionId`
+- `stripePaymentIntentId`
 - `userId`
 - `courseId`
 - `amount`
@@ -202,7 +206,7 @@ Clerk is the source of truth for identities, sessions, public role metadata, and
 - `purchasedAt`
 - `createdAt`
 - `updatedAt`
-- unique constraint on `clerkPurchaseId`
+- unique constraint on `stripePaymentIntentId`
 
 ### `lesson_progress`
 
@@ -217,7 +221,7 @@ Clerk is the source of truth for identities, sessions, public role metadata, and
 - `updatedAt`
 - unique constraint on `userId` and `lessonId`
 
-The entitlement check is derived from an active paid purchase for the user and course. Purchases are not duplicated when Clerk retries a webhook.
+The entitlement check is derived from an active paid Stripe purchase for the user and course. Purchases are not duplicated when Stripe retries a webhook. Public catalog, syllabus, and preview pages do not query entitlements; the authenticated course overview may check the current user's entitlement only to render a Continue learning link.
 
 ## 7. Request and Data Flows
 
@@ -240,11 +244,11 @@ The entitlement check is derived from an active paid purchase for the user and c
 
 1. A visitor can browse courses and syllabi without signing in.
 2. Purchase requires a Clerk session.
-3. The server creates a Clerk Billing checkout for the selected course and user.
-4. A signed Clerk webhook receives payment lifecycle events.
+3. The server creates a Stripe Checkout Session for the selected course's configured Stripe Price and Clerk user.
+4. A signed Stripe webhook receives payment lifecycle events.
 5. The webhook handler verifies the signature, deduplicates event delivery, and writes the purchase.
 6. A paid purchase grants access to the learning area.
-7. Refund or revoke events deactivate access according to the purchase status.
+7. Refund or dispute events deactivate access according to the purchase status.
 
 The webhook handler must be safe to retry and must never create duplicate purchases.
 
@@ -407,7 +411,7 @@ bun run build
 bunx playwright test
 ```
 
-Billing checkout, real Clerk sessions, webhook delivery, refund/revocation behavior, and production deployment require manual verification in addition to automated tests.
+Billing checkout, real Clerk sessions, Stripe webhook delivery, refund/revocation behavior, and production deployment require manual verification in addition to automated tests.
 
 ## 12. Error Handling and Security
 
@@ -432,7 +436,7 @@ Billing checkout, real Clerk sessions, webhook delivery, refund/revocation behav
 4. Integrate Clerk authentication, user synchronization, and admin authorization.
 5. Build public landing page and shared visual system.
 6. Build catalog, course overview, and syllabus pages.
-7. Integrate Clerk Billing and webhook-driven purchases.
+7. Integrate Stripe Checkout and webhook-driven purchases.
 8. Build student dashboard and protected learning routes.
 9. Add video adapter, autosave, completion, and progress calculations.
 10. Build admin dashboard and content editors.

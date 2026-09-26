@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1790328918047,
+      "tag": "0000_align_lms_contracts",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790334196442,
+      "tag": "0001_stripe_purchase_contract",
+      "breakpoints": true
+    }
+  ]
+}
