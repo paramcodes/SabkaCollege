@@ -66,10 +66,23 @@ is a pure function and is unit-tested in `tests/unit/auth/user-sync.test.ts`.
 
 ### Admin promotion
 
-`CLERK_INITIAL_ADMIN_EMAILS` is a comma-separated allow-list applied at sync
-time. Granting admin means setting the Clerk `publicMetadata.role`, which then
-flows into `users.role` on the next sync. Never write `users.role` directly:
-the next sync overwrites it.
+Granting admin means setting the Clerk `publicMetadata.role` to `"admin"`,
+which then flows into `users.role` on the next sync. Never write `users.role`
+directly: the next sync overwrites it.
+
+`CLERK_INITIAL_ADMIN_EMAILS` is a comma-separated allow-list, but it is a
+bootstrap **fallback**, not a role store. Precedence, exactly as
+`resolveUserRole` in `src/lib/validation/user.ts` implements it:
+
+1. An explicit Clerk `publicMetadata.role` of `admin` or `student` wins,
+   including for a listed email — so Clerk can demote a listed account.
+2. A metadata `role` that is neither `admin` nor `student` is treated as
+   absent, so a typo falls through instead of locking anyone out.
+3. Only when metadata has no role does a listed email become `admin`.
+4. Anyone else is written as `student`.
+
+The list exists so the first admins exist before any metadata has been set.
+After that, Clerk metadata is the source of truth.
 
 ## Access: a paid purchase is the only grant
 
@@ -167,7 +180,7 @@ retry an event you will never handle.
 | `CLERK_SECRET_KEY` | server | Clerk backend API |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | both | Clerk frontend key |
 | `CLERK_WEBHOOK_SIGNING_SECRET` | server | Verifies Clerk events |
-| `CLERK_INITIAL_ADMIN_EMAILS` | server | Comma-separated admin allow-list |
+| `CLERK_INITIAL_ADMIN_EMAILS` | server | Comma-separated admin bootstrap list; applies only when Clerk metadata has no `role` |
 | `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | both | Defaults to `/sign-in` |
 | `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | both | Defaults to `/sign-up` |
 | `STRIPE_SECRET_KEY` | server | Stripe API |
@@ -183,8 +196,10 @@ line.
 **Granting admin access to someone**
 
 1. Set `publicMetadata.role = "admin"` on the Clerk user.
-2. Confirm the email is in `CLERK_INITIAL_ADMIN_EMAILS` if the grant is meant to
-   survive a full resync.
+2. Do not rely on `CLERK_INITIAL_ADMIN_EMAILS` for this account. The list only
+   bootstraps a user whose metadata has no `role`, so a listed address with
+   `role: "student"` is synced as a student. To revoke instead, set the Clerk
+   metadata to `student` — the list cannot demote.
 3. Have them reload. The next sync writes `users.role`.
 4. Verify at `/admin` — the layout redirects to sign-in if the role did not
    land.
@@ -226,7 +241,9 @@ that the Clerk user has a primary email — `getRequiredEmail` rejects an accoun
 with no email address.
 
 **A user is admin in Clerk but not in `/admin`.** The mirror has not synced.
-Check `CLERK_INITIAL_ADMIN_EMAILS` and reload so the request re-syncs.
+Reload so the request re-syncs. If the Clerk user also has
+`publicMetadata.role = "student"`, the row is being written as `student` on
+purpose — the metadata wins over `CLERK_INITIAL_ADMIN_EMAILS`.
 
 **Checkout does not start.** In order: is the user signed in, is the course
 `published`, is `stripePriceId` set, and is `NEXT_PUBLIC_APP_URL` set? The

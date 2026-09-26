@@ -454,7 +454,14 @@ the release plan; record each one separately.
 - [ ] Confirm a **published** course appears in the catalogue and a **draft**
       course does not, in the catalogue, in search, and by direct URL.
 - [ ] Watch a lesson to 90%. Confirm the lesson completes and the dashboard
-      progress updates without a reload.
+      progress updates without a reload. The stored metric is
+      **furthest validated playback position / canonical duration**, not
+      accumulated unique watch time, so a seek to the end reports the same
+      number as a full watch and **seeks can over-report**. The gate is safe
+      but approximate: it is a floor for "reached the end region", not evidence
+      of comprehension. Do not build grading, certificates, or time-spent
+      reporting on this column without replacing it. See
+      [architecture](#the-video-progress-metric).
 - [ ] Confirm the refund and dispute paths never leave a half-written purchase
       row: each event either applies fully or rolls back.
 

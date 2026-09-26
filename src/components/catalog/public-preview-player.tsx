@@ -1,19 +1,18 @@
-import {
-  getPublicEmbed,
-  type PublicVideoProvider,
-} from "@/src/lib/validation/public-preview";
+import type { PublicEmbed } from "@/src/lib/validation/public-preview";
 
+/**
+ * Renders an embed that the server already resolved against the shared video
+ * allow-list. This component intentionally takes no `provider` or `reference`
+ * prop: widening the policy in the browser would let an unauthenticated
+ * visitor point a frame at an arbitrary host.
+ */
 export function PublicPreviewPlayer({
   title,
-  provider,
-  reference,
+  embed,
 }: {
   title: string;
-  provider: PublicVideoProvider;
-  reference: string | null;
+  embed: PublicEmbed | null;
 }) {
-  const embed = getPublicEmbed(provider, reference);
-
   if (!embed) {
     return (
       <div className="grid aspect-video place-items-center border border-foreground/20 bg-secondary/45 p-8 text-center">

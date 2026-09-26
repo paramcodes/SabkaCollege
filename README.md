@@ -35,14 +35,14 @@ empty or placeholder values.
 | `CLERK_SECRET_KEY` | server | Clerk backend API key. |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | browser | Clerk frontend key. Shipped to every visitor. |
 | `CLERK_WEBHOOK_SIGNING_SECRET` | server | Verifies `POST /api/webhooks/clerk`. |
-| `CLERK_INITIAL_ADMIN_EMAILS` | server | Comma-separated, email addresses promoted to `admin` at user-sync time. A **local bootstrap only** — see below. Unset or empty promotes nobody. |
+| `CLERK_INITIAL_ADMIN_EMAILS` | server | Comma-separated, email addresses bootstrapped as `admin` at user-sync time — but only when Clerk public metadata carries no `role`. A **bootstrap fallback only** — see below. Unset or empty bootstraps nobody. |
 | `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | browser | Defaults to `/sign-in`. |
 | `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | browser | Defaults to `/sign-up`. |
 | `STRIPE_SECRET_KEY` | server | Stripe API key. |
 | `STRIPE_WEBHOOK_SECRET` | server | Verifies `POST /api/webhooks/stripe`. |
 | `NEXT_PUBLIC_APP_URL` | browser | Absolute origin used to build Stripe redirect URLs. Must match the registered webhook host. |
 | `EXTERNAL_VIDEO_ALLOWED_HOSTS` | server | Comma-separated extra hostnames an `external` lesson may embed. Not a secret; the server reads it so a client cannot widen the list. |
-| `NEXT_PUBLIC_EXTERNAL_VIDEO_ALLOWED_HOSTS` | browser | Same list, for the browser half. The effective allow-list is the union of this, the server value, and the built-in provider hosts (`www.youtube-nocookie.com`, `player.vimeo.com`, `stream.mux.com`). An `external` lesson whose host is not on that list fails closed and renders no player. |
+| `NEXT_PUBLIC_EXTERNAL_VIDEO_ALLOWED_HOSTS` | browser, but also read on the server | The same list, for the browser half. It is read in the shared `src/lib/video/providers.ts` allow-list check, which the server lesson route and the server-side preview validation also call — so setting it affects server rendering too, and it must not be used for anything secret. The effective allow-list is the union of this, the server value, and the built-in provider hosts (`www.youtube-nocookie.com`, `player.vimeo.com`, `stream.mux.com`). An `external` lesson whose host is not on that list fails closed and renders no player. |
 
 Anything prefixed `NEXT_PUBLIC_` is delivered to every browser. A secret behind
 that prefix is a published secret.
@@ -55,23 +55,30 @@ never serialized into a response, and never reaches the browser. Comparison is
 on the trimmed, lower-cased address, so `Owner@Example.com` and
 `owner@example.com` are the same entry.
 
-What it does: when a listed address is synced, that user is written as
-`admin`. It only ever **promotes** — an address that is not listed takes the
-role Clerk reports, so listing someone can never demote an existing admin.
+What it does: when a listed address is synced **and its Clerk public metadata
+carries no `role` key at all**, that user is written as `admin`. That is the
+whole effect.
 
 What it is not: it is not the long-term source of truth for roles. **Clerk
-public metadata remains authoritative for every account that is not on the
-list.** Once an account exists, the durable way to promote or demote it is
+public metadata is authoritative for every account**, listed or not. Once an
+account exists, the durable way to promote or demote it is
 `publicMetadata: { role: "admin" | "student" }` in Clerk; the next sync writes
-that value into `users.role`. The allow-list exists to get the very first
-admins in before any metadata has been set, and a listed address keeps
-`admin` on every sync — that is how a bootstrap avoids being clobbered by
-still-empty metadata.
+that value into `users.role`. The list exists only to get the very first
+admins in before any metadata has been set.
+
+The precedence, in order:
+
+1. Clerk `publicMetadata.role` of `admin` or `student` — **always wins**, even
+   for a listed address. An unrecognized value (anything other than `admin` or
+   `student`) is treated as absent, so a typo cannot lock someone out.
+2. Otherwise, a listed address is bootstrapped as `admin`.
+3. Otherwise, the user is written as `student`.
 
 Two consequences worth stating plainly:
 
-- A listed address is written as `admin` even if Clerk metadata says
-  `student`. The list promotes; it never demotes anyone who is not listed.
+- A listed address whose Clerk metadata says `student` is written as
+  `student` — the list can bootstrap an admin, never demote one. That is what
+  makes demotion through Clerk possible.
 - Removing an address from the list does **not** revoke admin by itself. The
   next sync writes whatever Clerk metadata says. If that metadata still says
   `admin`, the user stays an admin; only after the metadata is changed does the
@@ -89,8 +96,8 @@ Two consequences worth stating plainly:
 4. Roles live in Clerk **public metadata** as `{ "role": "admin" | "student" }`.
    That is the long-term source of truth. Granting or revoking admin means
    editing Clerk metadata, never writing `users.role` directly — the next sync
-   overwrites it. `CLERK_INITIAL_ADMIN_EMAILS` is a local bootstrap for the
-   first admins, described below.
+   overwrites it. `CLERK_INITIAL_ADMIN_EMAILS` is a bootstrap fallback for the
+   first admins — it applies only when metadata has no role — described below.
 5. Register `https://<your-host>/api/webhooks/clerk` and set
    `CLERK_WEBHOOK_SIGNING_SECRET` from that endpoint's signing secret.
 

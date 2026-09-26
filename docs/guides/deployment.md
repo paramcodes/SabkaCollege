@@ -43,6 +43,18 @@ find `docs/blog` and `docs/guides`, and static analysis cannot see that the
 result is a fixed content subdirectory. The warnings are expected for the
 content loader; they do not fail the build.
 
+The consequence matters for packaging. Because the content path is resolved
+dynamically, the tracer cannot tell which files are content, so it traces the
+**whole project**. A standard `next build` still works — everything is included
+— but the output is larger than it needs to be, and tracing the whole project
+is the one thing to settle before switching to `output: "standalone"`, where an
+over-broad trace is a self-contained bundle that carries the entire repository
+rather than the app. The follow-up is to make the content location static: move
+the collections under `src/content` so the path is a literal in the source, or
+declare the files explicitly with `outputFileTracingIncludes` in
+`next.config.ts`. Do that before adopting `output: "standalone"`; the two
+Turbopack warnings above are the signal that it is still outstanding.
+
 ## Build and run
 
 ```bash

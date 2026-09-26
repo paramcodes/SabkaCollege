@@ -1,6 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { getVideoEmbedUrl } from "@/src/lib/video/providers";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("getVideoEmbedUrl", () => {
   it("builds privacy-safe URLs for supported provider references", () => {
@@ -35,6 +39,31 @@ describe("getVideoEmbedUrl", () => {
     expect(
       getVideoEmbedUrl("cloudflare_stream", "https://customer.example.com/abc/iframe"),
     ).toBeNull();
+    expect(
+      getVideoEmbedUrl(
+        "cloudflare_stream",
+        "https://customer-abc.cloudflarestream.com/asset-123/iframe",
+      ),
+    ).toBe("https://customer-abc.cloudflarestream.com/asset-123/iframe");
+  });
+
+  it("accepts a host added through the server allow-list only", () => {
+    const unlisted = "https://player.staging.example.com/embed/lesson-1";
+    const listed = "player.staging.example.com";
+
+    expect(getVideoEmbedUrl("external", unlisted)).toBeNull();
+
+    vi.stubEnv("EXTERNAL_VIDEO_ALLOWED_HOSTS", listed);
+    expect(getVideoEmbedUrl("external", unlisted)).toBe(unlisted);
+  });
+
+  it("normalizes a Cloudflare Stream asset path to a single /iframe suffix", () => {
+    expect(
+      getVideoEmbedUrl(
+        "cloudflare_stream",
+        "https://customer-abc.cloudflarestream.com/asset-123",
+      ),
+    ).toBe("https://customer-abc.cloudflarestream.com/asset-123/iframe");
     expect(
       getVideoEmbedUrl(
         "cloudflare_stream",

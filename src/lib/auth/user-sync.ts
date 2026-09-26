@@ -25,11 +25,15 @@ const joinName = (firstName: string | null, lastName: string | null) => {
 };
 
 /**
- * `CLERK_INITIAL_ADMIN_EMAILS` is a bootstrap for the very first admins, not a
- * role store. Reading it here keeps the value server-only: it is never
- * prefixed with `NEXT_PUBLIC_`, never serialized into a response, and never
- * reaches the browser. For anything after the first sign-in, Clerk public
- * metadata is the source of truth — see `docs/guides/authentication-and-billing.md`.
+ * `CLERK_INITIAL_ADMIN_EMAILS` is a bootstrap fallback for the very first
+ * admins, not a role store. Reading it here keeps the value server-only: it is
+ * never prefixed with `NEXT_PUBLIC_`, never serialized into a response, and
+ * never reaches the browser. It is passed on as a bare flag, and
+ * `resolveUserRole` applies it only when Clerk public metadata carries no
+ * `role`: an explicit `role` in Clerk always wins, which is what makes both
+ * demotion and typos in the list harmless. Clerk public metadata is the source
+ * of truth for every account — see
+ * `docs/guides/authentication-and-billing.md`.
  */
 const isInitialAdminEmail = (email: string): boolean =>
   parseInitialAdminEmails(process.env.CLERK_INITIAL_ADMIN_EMAILS).has(

@@ -40,7 +40,7 @@ describe("CLERK_INITIAL_ADMIN_EMAILS allow-list parsing", () => {
 });
 
 describe("role resolution during user sync", () => {
-  it("promotes a listed email to admin even without Clerk metadata", () => {
+  it("bootstraps a listed email as admin when Clerk metadata has no role", () => {
     const allowList = parseInitialAdminEmails("admin@example.com");
     const email = "Admin@Example.com";
 
@@ -49,22 +49,37 @@ describe("role resolution during user sync", () => {
     ).toBe("admin");
   });
 
-  it("leaves Clerk public metadata authoritative for everyone else", () => {
+  it("leaves an unlisted user with no metadata as a student", () => {
     const allowList = parseInitialAdminEmails("admin@example.com");
 
-    expect(resolveUserRole({ role: "student" }, allowList.has("other@example.com"))).toBe(
+    expect(resolveUserRole({}, allowList.has("other@example.com"))).toBe(
       "student",
     );
-    expect(resolveUserRole({ role: "admin" }, allowList.has("other@example.com"))).toBe(
-      "admin",
-    );
-    expect(resolveUserRole({}, allowList.has("other@example.com"))).toBe("student");
   });
 
-  it("writes the resolved role into the synchronized row", () => {
-    // The allow-list wins over a `student` value in Clerk metadata: that is the
-    // documented precedence, and it is why operators should still promote
-    // anyone beyond the first admins through Clerk public metadata.
+  it("ignores metadata roles that are neither admin nor student", () => {
+    const allowList = parseInitialAdminEmails("admin@example.com");
+
+    expect(
+      resolveUserRole({ role: "owner" }, allowList.has("other@example.com")),
+    ).toBe("student");
+    expect(
+      resolveUserRole({ role: 1 }, allowList.has("admin@example.com")),
+    ).toBe("admin");
+  });
+
+  it("keeps explicit Clerk metadata authoritative over the allow-list", () => {
+    const allowList = parseInitialAdminEmails("admin@example.com");
+
+    expect(
+      resolveUserRole({ role: "admin" }, allowList.has("other@example.com")),
+    ).toBe("admin");
+    expect(
+      resolveUserRole({ role: "student" }, allowList.has("other@example.com")),
+    ).toBe("student");
+  });
+
+  it("demotes a listed email whose Clerk metadata says student", () => {
     const syncedAt = new Date("2026-09-26T09:00:00.000Z");
 
     expect(
@@ -74,6 +89,25 @@ describe("role resolution during user sync", () => {
           publicMetadata: { role: "student" },
           isInitialAdmin: true,
         }),
+        syncedAt,
+      ),
+    ).toEqual({
+      id: "user_2abc",
+      email: "admin@example.com",
+      name: null,
+      avatarUrl: null,
+      role: "student",
+      lastSyncedAt: syncedAt,
+      updatedAt: syncedAt,
+    });
+  });
+
+  it("bootstraps a listed email with no metadata as admin", () => {
+    const syncedAt = new Date("2026-09-26T09:00:00.000Z");
+
+    expect(
+      buildAppUserSyncValues(
+        identity({ email: "admin@example.com", isInitialAdmin: true }),
         syncedAt,
       ),
     ).toEqual({

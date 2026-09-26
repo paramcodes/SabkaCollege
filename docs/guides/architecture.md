@@ -74,6 +74,35 @@ Client components must not receive secrets, database handles, or Stripe
 objects. If a client component needs data, fetch it on the server and pass
 plain serialisable props down.
 
+## The video progress metric
+
+MVP completion is an **approximation**, and the approximation is deliberate.
+`deriveProgressFromPosition` in `src/lib/video/player-events.ts` computes the
+metric the server stores as `maxWatchedPercentage` as:
+
+```
+maxWatchedPercentage = furthest validated playback position / canonical duration
+```
+
+The denominator is the canonical server duration. A client-supplied percentage
+is accepted on the wire for compatibility and then ignored — the server always
+recomputes it. `shouldAutoComplete` in `src/lib/utils/progress.ts` completes a
+lesson at `>= 0.9`.
+
+Read the numerator literally: it is the furthest position reached, not the sum
+of time actually spent watching. A learner who seeks straight to the end
+reports the same value as one who watched every second. Two consequences:
+
+- **Seeks can over-report.** Skipping ahead inflates the metric. Nothing in the
+  MVP corrects for it.
+- **The 90% gate is safe but approximate.** It is a floor for "reached the end
+  region", not evidence of comprehension. Do not build grading, certificates, or
+  "time spent" reporting on top of this column without replacing it with an
+  accumulated, seek-aware watch-time measurement.
+
+If you need a real watch-time number, that is a schema change plus a new writer
+— not a change to the client event handler.
+
 ## Cache Components
 
 `next.config.ts` sets `cacheComponents: true`. Three things follow.

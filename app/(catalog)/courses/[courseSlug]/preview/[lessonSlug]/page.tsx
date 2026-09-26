@@ -12,6 +12,7 @@ import {
   courseSlugSchema,
   lessonSlugSchema,
 } from "@/src/lib/validation/catalog-routes";
+import { getPublicEmbed } from "@/src/lib/validation/public-preview";
 
 export const metadata: Metadata = {
   title: "Public lesson preview — SabkaCollege",
@@ -104,6 +105,10 @@ export default async function PublicPreviewPage({
   }
 
   const { preview } = result;
+  // Resolved on the server through the same allow-list the protected player
+  // uses, so a public preview can never frame a host a paid lesson would
+  // refuse. The client component only renders the result.
+  const embed = getPublicEmbed(preview.videoProvider, preview.videoReference);
   const durationLabel =
     preview.durationSeconds > 0
       ? `${Math.max(1, Math.round(preview.durationSeconds / 60))} min`
@@ -136,11 +141,7 @@ export default async function PublicPreviewPage({
       </header>
 
       <div className="mt-10 border border-foreground/20 bg-card p-2 shadow-[10px_10px_0_var(--secondary)] sm:p-3">
-        <PublicPreviewPlayer
-          title={preview.title}
-          provider={preview.videoProvider}
-          reference={preview.videoReference}
-        />
+        <PublicPreviewPlayer title={preview.title} embed={embed} />
       </div>
 
       <p className="mt-5 text-sm text-muted-foreground">

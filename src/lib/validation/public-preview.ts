@@ -1,13 +1,14 @@
-const youtubeReferencePattern = /^[A-Za-z0-9_-]{6,20}$/;
-const vimeoReferencePattern = /^\d{6,12}$/;
-const muxReferencePattern = /^[A-Za-z0-9_-]{8,128}$/;
+import {
+  getVideoEmbedUrl,
+  type VideoProvider,
+} from "@/src/lib/video/providers";
 
-export type PublicVideoProvider =
-  | "youtube"
-  | "vimeo"
-  | "mux"
-  | "cloudflare_stream"
-  | "external";
+/**
+ * The public preview and the protected lesson player share one policy. The
+ * database enum is the single source of provider names, so the public path
+ * reuses it rather than keeping a second union that can drift.
+ */
+export type PublicVideoProvider = VideoProvider;
 
 export type PublicEmbed = {
   kind: "iframe" | "video";
@@ -16,87 +17,52 @@ export type PublicEmbed = {
   referrerPolicy?: "strict-origin-when-cross-origin" | "no-referrer";
 };
 
+/**
+ * The public preview renders third-party frames, so it stays more locked down
+ * than the signed-in player: no `allow-same-origin` on a frame we do not
+ * control, and no referrer for hosts that are not one of the well-known
+ * providers.
+ */
 const iframeDefaults = {
   sandbox: "allow-scripts allow-same-origin allow-presentation",
   referrerPolicy: "strict-origin-when-cross-origin" as const,
 };
 
+const externalIframeDefaults = {
+  sandbox: "allow-scripts allow-presentation",
+  referrerPolicy: "no-referrer" as const,
+};
+
+/**
+ * Resolves a preview video reference to a safe embed descriptor.
+ *
+ * Resolution is delegated to `getVideoEmbedUrl` so an unauthenticated visitor
+ * and a paying student are subject to exactly the same allow-list: configured
+ * external hosts, Cloudflare Stream path normalization, and the YouTube /
+ * Vimeo / Mux reference shapes. This function adds no host of its own; a
+ * reference that the protected player would reject is rejected here too, and
+ * the caller renders the unavailable state.
+ *
+ * Call this on the server. The resolved object is a plain, serializable value
+ * that the client component renders as-is.
+ */
 export const getPublicEmbed = (
   provider: PublicVideoProvider,
   reference: string | null,
 ): PublicEmbed | null => {
-  if (!reference) {
+  const src = getVideoEmbedUrl(provider, reference);
+
+  if (!src) {
     return null;
   }
 
-  if (provider === "youtube" && youtubeReferencePattern.test(reference)) {
-    return {
-      kind: "iframe",
-      src: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(reference)}`,
-      ...iframeDefaults,
-    };
-  }
-
-  if (provider === "vimeo" && vimeoReferencePattern.test(reference)) {
-    return {
-      kind: "iframe",
-      src: `https://player.vimeo.com/video/${encodeURIComponent(reference)}`,
-      ...iframeDefaults,
-    };
-  }
-
-  if (provider === "mux" && muxReferencePattern.test(reference)) {
-    return {
-      kind: "video",
-      src: `https://stream.mux.com/${encodeURIComponent(reference)}/public-video`,
-    };
-  }
-
-  if (provider === "cloudflare_stream") {
-    try {
-      const url = new URL(reference);
-      const trustedHost = url.hostname.endsWith(".cloudflarestream.com");
-      const hasAssetPath = /^\/[A-Za-z0-9_-]{8,128}\/?$/.test(url.pathname);
-
-      if (
-        url.protocol === "https:" &&
-        trustedHost &&
-        hasAssetPath &&
-        !url.username &&
-        !url.password
-      ) {
-        return {
-          kind: "iframe",
-          src: url.toString(),
-          ...iframeDefaults,
-        };
-      }
-    } catch {
-      return null;
-    }
+  if (provider === "mux") {
+    return { kind: "video", src };
   }
 
   if (provider === "external") {
-    try {
-      const url = new URL(reference);
-
-      if (
-        url.protocol === "https:" &&
-        url.hostname.length > 0 &&
-        !url.username &&
-        !url.password
-      ) {
-        return {
-          kind: "iframe",
-          src: url.toString(),
-          sandbox: "allow-scripts allow-presentation",
-          referrerPolicy: "no-referrer",
-        };
-      }
-    } catch {
-      return null;
-    }
+    return { kind: "iframe", src, ...externalIframeDefaults };
   }
 
-  return null;
+  return { kind: "iframe", src, ...iframeDefaults };
 };
