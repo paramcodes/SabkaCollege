@@ -316,10 +316,14 @@ This needs eyes on the page.
 tracked live rather than snapshotted once.
 `src/components/motion/reveal.tsx` and `src/components/motion/hero-motion.tsx`
 both return early when the preference is set, so the animated GSAP timelines
-never start. Because the update is a subscription rather than a one-shot read,
-a page loaded with motion enabled and then reduced must also settle correctly
-without a reload — and a page loaded with motion already reduced must not start
-its timelines when the preference is later turned off.
+are suppressed while the preference is reduced. Because the update is a
+subscription rather than a one-shot read, a page loaded with motion enabled and
+then reduced must also settle correctly without a reload. The converse is a
+one-way change, not a promise of never animating: if the preference is later
+turned off, the effect re-runs and may start the timeline on that next effect
+run. A reveal that was suppressed while reduced may therefore animate after the
+preference is cleared; that is expected, and the check below is about content
+staying visible and interactive either way.
 
 ### Steps
 
@@ -341,7 +345,9 @@ its timelines when the preference is later turned off.
       confirm the page responds — the provider subscribes to the media query's
       `change` event, so a late change must be picked up rather than requiring a
       refresh. Test both directions (enable → disable and disable → enable) on
-      the same loaded page.
+      the same loaded page, and confirm that turning motion back on either
+      replays the effect or leaves it settled — it must never leave content
+      hidden.
 - [ ] Confirm no content is stranded mid-transition when the preference flips
       while a reveal is still pending: a page must not end up with a permanently
       hidden section because an animation was interrupted rather than

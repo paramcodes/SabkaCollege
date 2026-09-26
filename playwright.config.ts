@@ -115,7 +115,13 @@ export default defineConfig({
     // person opts in with `CLERK_E2E_REAL_INSTANCE=1`.
     command: `env -u DATABASE_URL ${clerkAuthEnv} bun run dev -- --hostname 127.0.0.1`,
     url: "http://127.0.0.1:3000/sign-in",
-    reuseExistingServer: !process.env.CI,
+    // The two modes must not share a server. A dev server started in default
+    // mode carries placeholder Clerk keys, so reusing it from an opted-in run
+    // would measure Clerk's behaviour against the wrong tenant and report it as
+    // this repository's. An opted-in run therefore always starts its own
+    // server. In the default mode `!process.env.CI` is kept, so a local
+    // placeholder/skip run still reuses an already-running dev server.
+    reuseExistingServer: useRealClerkInstance ? false : !process.env.CI,
     timeout: 120_000,
   },
 });
